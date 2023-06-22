@@ -2,10 +2,15 @@
 use std::env;
 use std::error::Error;
 use std::fmt;
+use std::fs;
 use std::io;
 use std::io::Write;
 use std::mem;
 use std::process;
+
+const KEYWORDS: [&'static str; 16] = ["and", "class", "else", "false", "fun", "for", "if",
+                     		 "nil", "or", "print", "return", "super", "this", "true",
+                     		 "var", "while"];
 
 fn main() {
   println!("\n");
@@ -24,7 +29,10 @@ fn main() {
 }
 
 fn run_file(arg: &str) {
-	run(arg.to_string());
+    let contents = fs::read_to_string(arg)
+        .expect("Should have been able to read the file");
+
+	run(contents);
 }
 
 fn run_prompt() -> io::Result<()> {
@@ -97,7 +105,7 @@ impl Scanner {
 			self.scan_token()
 		}
 
-		self.tokens.push(Token::new(TokenType::EOF, "".to_string(), /*null,*/ self.line));
+		self.tokens.push(Token::new(TokenType::Eof, "".to_string(), /*null,*/ self.line));
 		mem::replace(&mut self.tokens, Vec::new())
 	}
 
@@ -119,53 +127,151 @@ impl Scanner {
 		self.source[self.current + 1]
 	}
 
+	fn match_advance(&mut self, m: char) -> bool {
+		if self.is_at_end() { return false }
+		if self.peek() == m {
+			self.current += 1;
+			true
+		} else {
+			false
+		}
+	}
+
 	fn scan_token(&mut self) {
 		let ch = self.advance();
 		let token_type = match ch {
-			'(' => TokenType::LEFT_PAREN,
-			')' => TokenType::RIGHT_PAREN,
-			'{' => TokenType::LEFT_BRACE,
-			'}' => TokenType::RIGHT_BRACE,
-			',' => TokenType::COMMA,
-			'.' => TokenType::DOT,
-			'-' => TokenType::MINUS,
-			'+' => TokenType::PLUS,
-			';' => TokenType::SEMICOLON,
-			'*' => TokenType::STAR,
-			_ => { error(self.line, "Unexpected character."); TokenType::ERROR }
+			'(' => TokenType::LeftParen,
+			')' => TokenType::RightParen,
+			'{' => TokenType::LeftBrace,
+			'}' => TokenType::RightBrace,
+			',' => TokenType::Comma,
+			'.' => TokenType::Dot,
+			'-' => TokenType::Minus,
+			'+' => TokenType::Plus,
+			';' => TokenType::Semicolon,
+			'*' => TokenType::Star,
+			'>' => {
+				if self.match_advance('=') { TokenType::GreaterEqual } else { TokenType::Greater }
+			},
+			'<' => {
+				if self.match_advance('=') { TokenType::LessEqual } else { TokenType::Less }
+			},
+			'=' => {
+				if self.match_advance('=') { TokenType::EqualEqual } else { TokenType::Equal }
+			},
+			'!' => {
+				if self.match_advance('=') { TokenType::BangEqual } else { TokenType::Bang }
+			},
+			'/' => {
+				if self.match_advance('/') {
+					while !(self.peek() == '\n' || self.is_at_end())  { self.current += 1; }; return
+				} else {
+					TokenType::Slash
+				}
+			}
+			'"' => self.scan_string(),
+			a if a.is_alphabetic() => self.scan_word(),
+			d if d.is_digit(10) => self.scan_number(),
+			' ' | '\r' | '\t' => return,
+			'\n' => { self.line += 1; return },
+			_ => { error(self.line, "Unexpected character."); TokenType::Error }
 		};
 		self.add_token(token_type);
 	}
 
+	fn scan_string(&mut self) -> TokenType {
+		while !self.match_advance('"') {
+			if self.is_at_end() { error(self.line, "Unterminated string!"); return TokenType::Error }
+			self.current += 1
+		}
+		TokenType::StringLit(self.source_string[self.start + 1..self.current - 1].to_string())
+	}
+
+	fn scan_word(&mut self) -> TokenType {
+		while !self.is_at_end() && (self.peek().is_alphanumeric() || self.peek() == '_') {
+			self.current += 1
+		}
+		let substr = self.source_substr();
+		if KEYWORDS.contains(&&substr[..]) {
+			self.keyword_token(&substr)
+		} else {
+			TokenType::Identifier(substr)
+		}
+	}
+
+	fn scan_number(&mut self) -> TokenType {
+		while !self.is_at_end() && (self.peek().is_digit(10)) {
+			self.current += 1
+		}
+		if self.match_advance('.') {
+			if !self.peek().is_digit(10) { error(self.line, "Number has trailing ."); return TokenType::Error }
+			while self.peek().is_digit(10) {
+				self.current += 1;
+			}
+		}
+		let n = self.source_substr().parse::<f64>().unwrap();
+		TokenType::Number(n)
+	}
+	// // literals.,
+	// Number,
+
 	fn add_token(&mut self, ttype: TokenType) {
-		self.tokens.push(Token::new(ttype, "".to_string(), /*null,*/ self.line));
+		let s = self.source_substr();
+		self.tokens.push(Token::new(ttype, s, /*null,*/ self.line));
+	}
+
+	fn source_substr(&self) -> String {
+		self.source_string[self.start..self.current].to_string()
+	}
+
+	fn keyword_token(&self, keyword: &str) -> TokenType {
+		match keyword {
+			"and" => TokenType::And,
+			"class" => TokenType::Class,
+			"else" => TokenType::Else,
+			"false" => TokenType::False,
+			"fun" => TokenType::Fun,
+			"for" => TokenType::For,
+			"if" => TokenType::If,
+			"nil" => TokenType::Nil,
+			"or" => TokenType::Or,
+			"print" => TokenType::Print,
+			"return" => TokenType::Return,
+			"super" => TokenType::Super,
+			"this" => TokenType::This,
+			"true" => TokenType::True,
+			"var" => TokenType::Var,
+			"while" => TokenType::While,
+			_ => { error(self.line, "Invalid keyword!"); TokenType::Error }
+		}
 	}
 }
 
 
+
 #[derive(Debug)]
 pub enum TokenType {
-  // Single-character tokens.
-  LEFT_PAREN, RIGHT_PAREN, LEFT_BRACE, RIGHT_BRACE,
-  COMMA, DOT, MINUS, PLUS, SEMICOLON, SLASH, STAR,
+	// single-character tokens.,
+	LeftParen, RightParen, LeftBrace, RightBrace,
+	Comma, Dot, Minus, Plus, Semicolon, Slash, Star,
 
-  // One or two character tokens.
-  BANG, BANG_EQUAL,
-  EQUAL, EQUAL_EQUAL,
-  GREATER, GREATER_EQUAL,
-  LESS, LESS_EQUAL,
+	// one or two character tokens.,
+	Bang, BangEqual,
+	Equal, EqualEqual,
+	Greater, GreaterEqual,
+	Less, LessEqual,
 
-  // Literals.
-  IDENTIFIER, STRING, NUMBER,
+	// literals.,
+	Identifier(String), StringLit(String), Number(f64),
 
-  // Keywords.
-  AND, CLASS, ELSE, FALSE, FUN, FOR, IF, NIL, OR,
-  PRINT, RETURN, SUPER, THIS, TRUE, VAR, WHILE,
+	// keywords.,
+	And, Class, Else, False, Fun, For, If, Nil, Or,
+	Print, Return, Super, This, True, Var, While,
 
-  EOF,
+	Eof,
 
-  // Temporary Error one
-  ERROR
+	// temporary error one,
+	Error,
 }
 
 
