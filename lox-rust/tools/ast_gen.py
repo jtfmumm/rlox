@@ -68,4 +68,4 @@ output += '}'
 with open('src/expr.rs', 'w+') as f:
 	f.write(output)
 
-print(output)
+# print(output)

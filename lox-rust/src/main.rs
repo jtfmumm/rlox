@@ -1,5 +1,5 @@
 // use argparse::{ArgumentParser, StoreTrue};
-use std::any::Any;
+// use std::any::Any;
 use std::env;
 use std::error::Error;
 use std::fmt;
@@ -8,7 +8,7 @@ use std::io;
 use std::io::Write;
 use std::mem;
 use std::process;
-use std::rc::Rc;
+// use std::rc::Rc;
 
 const KEYWORDS: [&'static str; 16] = ["and", "class", "else", "false", "fun", "for", "if",
                      		 "nil", "or", "print", "return", "super", "this", "true",
@@ -77,9 +77,9 @@ impl Token {
 		Token { ttype, lexeme, /*literal,*/ line }
 	}
 
-	fn to_string(&self) -> String {
-		format!("{:?} {:?}", self.ttype, self.lexeme/*, literal*/)
-	}
+	// fn to_string(&self) -> String {
+	// 	format!("{:?} {:?}", self.ttype, self.lexeme/*, literal*/)
+	// }
 }
 
 
@@ -125,9 +125,9 @@ impl Scanner {
 		self.source[self.current]
 	}
 
-	fn peek_next(&self) -> char {
-		self.source[self.current + 1]
-	}
+	// fn peek_next(&self) -> char {
+	// 	self.source[self.current + 1]
+	// }
 
 	fn match_advance(&mut self, m: char) -> bool {
 		if self.is_at_end() { return false }
