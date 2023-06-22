@@ -7,8 +7,11 @@ class Field:
 
 	def __str__(self):
 		t = self.type
-		if t == 'Expr' or t == 'Any':
-			t = 'Box<dyn ' + t + '>'
+		if t == 'Any':
+			t = 'Rc<dyn ' + t + '>'
+		elif t == 'Expr':
+			t = 'Rc<' + t + '>'
+
 		return self.name + ": " + t
 
 class Expr:
@@ -44,18 +47,21 @@ with open('tools/ast_def.json', 'r') as f:
 
 exprs = list(map(parse_expr, data))
 
-output = 'pub trait Expr {}\n\n'
+output = 'pub enum Expr {\n'
 
 for e in exprs:
-	output += 'pub struct ' + e.name + ' {\n'
-	for f in e.fields:
-		output += '\t' + str(f) + ',\n'
-	output += '}\n\n'
-	output += 'impl ' + e.name + ' {\n'
-	output += '\tfn new('
-	output += ', '.join(map(str, e.fields)) + ') -> Self {\n'
-	output += '\t\t' + e.name + ' { '
-	output += ', '.join(e.field_names()) + ' }\n\t}\n}\n\n'
-	output += 'impl Expr for ' + e.name + ' {}\n\n'
+	output += '\t' + e.name + ' { '
+	output += ', '.join(map(str, e.fields)) + ' },\n'
+
+output += '}\n\n'
+output += 'impl Expr {\n'
+
+for e in exprs:
+	output += '\tfn ' + e.name.lower() + '('
+	output += ', '.join(map(str, e.fields)) + ') -> Rc<Expr> {\n'
+	output += '\t\tRc::new(Expr::' + e.name + ' { '
+	output += ', '.join(e.field_names()) + ' })\n\t}\n\n'
+
+output += '}'
 
 print(output)

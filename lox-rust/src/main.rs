@@ -8,6 +8,7 @@ use std::io;
 use std::io::Write;
 use std::mem;
 use std::process;
+use std::rc::Rc;
 
 const KEYWORDS: [&'static str; 16] = ["and", "class", "else", "false", "fun", "for", "if",
                      		 "nil", "or", "print", "return", "super", "this", "true",
@@ -296,55 +297,28 @@ impl Error for GenError {}
 
 
 /////////////////
-pub trait Expr {}
-
-pub struct Binary {
-	left: Box<dyn Expr>,
-	operator: Token,
-	right: Box<dyn Expr>,
+pub enum Expr {
+	Binary { left: Rc<Expr>, operator: Token, right: Rc<Expr> },
+	Grouping { expression: Rc<Expr> },
+	Literal { value: Rc<dyn Any> },
+	Unary { operator: Token, right: Rc<Expr> },
 }
 
-impl Binary {
-	fn new(left: Box<dyn Expr>, operator: Token, right: Box<dyn Expr>) -> Self {
-		Binary { left, operator, right }
+impl Expr {
+	fn binary(left: Rc<Expr>, operator: Token, right: Rc<Expr>) -> Rc<Expr> {
+		Rc::new(Expr::Binary { left, operator, right })
 	}
-}
 
-impl Expr for Binary {}
-
-pub struct Grouping {
-	expression: Box<dyn Expr>,
-}
-
-impl Grouping {
-	fn new(expression: Box<dyn Expr>) -> Self {
-		Grouping { expression }
+	fn grouping(expression: Rc<Expr>) -> Rc<Expr> {
+		Rc::new(Expr::Grouping { expression })
 	}
-}
 
-impl Expr for Grouping {}
-
-pub struct Literal {
-	value: Box<dyn Any>,
-}
-
-impl Literal {
-	fn new(value: Box<dyn Any>) -> Self {
-		Literal { value }
+	fn literal(value: Rc<dyn Any>) -> Rc<Expr> {
+		Rc::new(Expr::Literal { value })
 	}
-}
 
-impl Expr for Literal {}
-
-pub struct Unary {
-	operator: Token,
-	right: Box<dyn Expr>,
-}
-
-impl Unary {
-	fn new(operator: Token, right: Box<dyn Expr>) -> Self {
-		Unary { operator, right }
+	fn unary(operator: Token, right: Rc<Expr>) -> Rc<Expr> {
+		Rc::new(Expr::Unary { operator, right })
 	}
-}
 
-impl Expr for Unary {}
+}
