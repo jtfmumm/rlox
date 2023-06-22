@@ -6,7 +6,10 @@ class Field:
 		self.type = typ
 
 	def __str__(self):
-		return self.name + ": " + self.type
+		t = self.type
+		if t == 'Expr' or t == 'Any':
+			t = 'Box<dyn ' + t + '>'
+		return self.name + ": " + t
 
 class Expr:
 	def __init__(self, name, fields):

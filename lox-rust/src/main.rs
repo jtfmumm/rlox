@@ -1,4 +1,5 @@
 // use argparse::{ArgumentParser, StoreTrue};
+use std::any::Any;
 use std::env;
 use std::error::Error;
 use std::fmt;
@@ -273,8 +274,6 @@ pub enum TokenType {
 	// temporary error one,
 	Error,
 }
-
-
 fn error(line_n: u32, msg: &str) {
 	report(line_n, "", msg);
 }
@@ -294,3 +293,58 @@ impl fmt::Display for GenError {
 }
 
 impl Error for GenError {}
+
+
+/////////////////
+pub trait Expr {}
+
+pub struct Binary {
+	left: Box<dyn Expr>,
+	operator: Token,
+	right: Box<dyn Expr>,
+}
+
+impl Binary {
+	fn new(left: Box<dyn Expr>, operator: Token, right: Box<dyn Expr>) -> Self {
+		Binary { left, operator, right }
+	}
+}
+
+impl Expr for Binary {}
+
+pub struct Grouping {
+	expression: Box<dyn Expr>,
+}
+
+impl Grouping {
+	fn new(expression: Box<dyn Expr>) -> Self {
+		Grouping { expression }
+	}
+}
+
+impl Expr for Grouping {}
+
+pub struct Literal {
+	value: Box<dyn Any>,
+}
+
+impl Literal {
+	fn new(value: Box<dyn Any>) -> Self {
+		Literal { value }
+	}
+}
+
+impl Expr for Literal {}
+
+pub struct Unary {
+	operator: Token,
+	right: Box<dyn Expr>,
+}
+
+impl Unary {
+	fn new(operator: Token, right: Box<dyn Expr>) -> Self {
+		Unary { operator, right }
+	}
+}
+
+impl Expr for Unary {}
