@@ -47,7 +47,8 @@ with open('tools/ast_def.json', 'r') as f:
 
 exprs = list(map(parse_expr, data))
 
-output = 'pub enum Expr {\n'
+output = '///////////////////////\n// This file is \n// auto-generated code\n///////////////////////\n'
+output += 'pub enum Expr {\n'
 
 for e in exprs:
 	output += '\t' + e.name + ' { '
@@ -63,5 +64,8 @@ for e in exprs:
 	output += ', '.join(e.field_names()) + ' })\n\t}\n\n'
 
 output += '}'
+
+with open('src/expr.rs', 'w+') as f:
+	f.write(output)
 
 print(output)
