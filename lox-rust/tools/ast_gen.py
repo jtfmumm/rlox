@@ -63,7 +63,7 @@ output += '}\n\n'
 output += 'impl Expr {\n'
 
 for e in exprs:
-	output += '\tfn ' + e.name.lower() + '('
+	output += '\tpub fn ' + e.name.lower() + '('
 	output += ', '.join(map(str, e.fields)) + ') -> Rc<Expr> {\n'
 	output += '\t\tRc::new(Expr::' + e.name + ' { '
 	output += ', '.join(e.field_names()) + ' })\n\t}\n\n'
@@ -73,7 +73,7 @@ output += """\t// Visitor methods
 		format!("({:?} {:?} )", left, right)
 	}
 
-	fn to_string(&self) -> String {
+	pub fn to_string(&self) -> String {
 		use Expr::*;
 
 		match *self {

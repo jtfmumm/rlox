@@ -1,9 +1,11 @@
 mod cerror;
 mod expr;
+mod parser;
 mod scanner;
 mod token;
 
 use cerror::error;
+use parser::Parser;
 use scanner::Scanner;
 // use token::{Token, TokenType};
 
@@ -60,9 +62,11 @@ fn run_prompt() -> io::Result<()> {
 fn run(source: String) {
 	let mut scanner = Scanner::new(source);
 	let tokens = scanner.scan_tokens();
-	for t in tokens {
-		println!("{:?}", t);
-	}
+	// for t in &tokens {
+	// 	println!("{:?}", t);
+	// }
+	let mut parser = Parser::new(tokens);
+	println!("{:?}", parser.equality().to_string());
 }
 
 

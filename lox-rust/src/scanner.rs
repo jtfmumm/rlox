@@ -33,7 +33,7 @@ impl Scanner {
 			self.scan_token()
 		}
 
-		self.tokens.push(Token::new(TokenType::Eof, "".to_string(), /*null,*/ self.line));
+		self.tokens.push(Token::new(TokenType::Eof, "".to_string(), "".to_string(), self.line));
 		mem::replace(&mut self.tokens, Vec::new())
 	}
 
@@ -145,7 +145,7 @@ impl Scanner {
 
 	fn add_token(&mut self, ttype: TokenType) {
 		let s = self.source_substr();
-		self.tokens.push(Token::new(ttype, s, /*null,*/ self.line));
+		self.tokens.push(Token::new(ttype, s.clone(), s, self.line));
 	}
 
 	fn source_substr(&self) -> String {

@@ -14,19 +14,19 @@ pub enum Expr {
 }
 
 impl Expr {
-	fn binary(left: Rc<Expr>, operator: Token, right: Rc<Expr>) -> Rc<Expr> {
+	pub fn binary(left: Rc<Expr>, operator: Token, right: Rc<Expr>) -> Rc<Expr> {
 		Rc::new(Expr::Binary { left, operator, right })
 	}
 
-	fn grouping(expression: Rc<Expr>) -> Rc<Expr> {
+	pub fn grouping(expression: Rc<Expr>) -> Rc<Expr> {
 		Rc::new(Expr::Grouping { expression })
 	}
 
-	fn literal(value: String) -> Rc<Expr> {
+	pub fn literal(value: String) -> Rc<Expr> {
 		Rc::new(Expr::Literal { value })
 	}
 
-	fn unary(operator: Token, right: Rc<Expr>) -> Rc<Expr> {
+	pub fn unary(operator: Token, right: Rc<Expr>) -> Rc<Expr> {
 		Rc::new(Expr::Unary { operator, right })
 	}
 
@@ -35,7 +35,7 @@ impl Expr {
 		format!("({:?} {:?} )", left, right)
 	}
 
-	fn to_string(&self) -> String {
+	pub fn to_string(&self) -> String {
 		use Expr::*;
 
 		match *self {

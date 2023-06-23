@@ -1,23 +1,24 @@
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Token {
-	ttype: TokenType,
-	lexeme: String,
-	// literal: ...,
-	line: u32,
+	pub ttype: TokenType,
+	pub lexeme: String,
+	pub literal: String,
+	pub line: u32,
 }
 
 impl Token {
-	pub fn new(ttype: TokenType, lexeme: String, /*lit: ...,*/ line: u32) -> Self {
+	pub fn new(ttype: TokenType, lexeme: String, literal: String, line: u32) -> Self {
 		// let literal = lit.to_string();
-		Token { ttype, lexeme, /*literal,*/ line }
+		Token { ttype, lexeme, literal, line }
 	}
 
 	pub fn to_string(&self) -> String {
-		format!("{:?} {:?}", self.ttype, self.lexeme/*, literal*/)
+		// format!("{:?} {:?}", self.ttype, self.lexeme/*, literal*/)
+		format!("{:?}", self.lexeme/*, literal*/)
 	}
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TokenType {
 	// single-character tokens.,
 	LeftParen, RightParen, LeftBrace, RightBrace,
