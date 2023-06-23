@@ -48,6 +48,11 @@ with open('tools/ast_def.json', 'r') as f:
 exprs = list(map(parse_expr, data))
 
 output = '///////////////////////\n// This file is \n// auto-generated code\n///////////////////////\n'
+output += """
+use crate::token::Token;
+use std::rc::Rc;
+
+"""
 output += 'pub enum Expr {\n'
 
 for e in exprs:
@@ -62,6 +67,27 @@ for e in exprs:
 	output += ', '.join(map(str, e.fields)) + ') -> Rc<Expr> {\n'
 	output += '\t\tRc::new(Expr::' + e.name + ' { '
 	output += ', '.join(e.field_names()) + ' })\n\t}\n\n'
+
+output += """\t// Visitor methods
+	fn parens(left: String, right: String) -> String {
+		format!("({:?} {:?} )", left, right)
+	}
+
+	fn to_string(&self) -> String {
+		use Expr::*;
+
+		match *self {
+			Binary { ref left, ref operator, ref right } => {
+				operator.to_string() + &Expr::parens(left.to_string(), right.to_string())
+			},
+			Grouping { ref expression } => expression.to_string(),
+			Literal { ref value } => value.to_owned(),
+			Unary { ref operator, ref right } => {
+				Expr::parens(operator.to_string(), right.to_string())
+			},
+		}
+	}
+"""
 
 output += '}'
 
