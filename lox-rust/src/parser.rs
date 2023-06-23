@@ -1,10 +1,8 @@
-use crate::cerror::error;
+use crate::cerror::cerror;
 use crate::expr::Expr;
 use crate::token::{Token, TokenType};
 
 use std::error::Error;
-use std::fmt;
-use std::mem;
 use std::rc::Rc;
 
 pub struct Parser {
@@ -18,14 +16,18 @@ impl Parser {
 		Parser { tokens, current }
 	}
 
-	fn is_at_end(&self) -> bool {
-		self.current >= self.tokens.len()
+	pub fn parse(&mut self) -> Option<Rc<Expr>> {
+		match self.expression() {
+			Ok(expr) => Some(expr),
+			Err(perror) => {
+				println!("{:?}", perror);
+				None
+			}
+		}
 	}
 
-	fn advance(&mut self) -> Token {
-		let t = self.tokens[self.current].clone();
-		self.current += 1;
-		t
+	fn is_at_end(&self) -> bool {
+		self.current >= self.tokens.len()
 	}
 
 	fn peek(&mut self) -> Token {
@@ -36,8 +38,14 @@ impl Parser {
 		self.tokens[self.current - 1].clone()
 	}
 
-	fn peek_next(&mut self) -> Token {
-		self.tokens[self.current + 1].clone()
+	// fn peek_next(&mut self) -> Token {
+	// 	self.tokens[self.current + 1].clone()
+	// }
+
+	fn advance(&mut self) -> Token {
+		let t = self.tokens[self.current].clone();
+		self.current += 1;
+		t
 	}
 
 	fn match_advance(&mut self, ts: &[TokenType]) -> bool {
@@ -52,86 +60,103 @@ impl Parser {
 		}
 	}
 
-	pub fn expression(&mut self) -> Rc<Expr> {
-		self.equality()
+	fn check(&mut self, t: TokenType) -> bool {
+		if self.is_at_end() { return false }
+		self.peek().ttype == t
 	}
 
-	pub fn equality(&mut self) -> Rc<Expr> {
-		let mut expr = self.comparison();
+	fn consume(&mut self, t: TokenType, msg: &str) -> Result<(), String> {
+		if self.check(t) {
+			self.advance();
+			Ok(())
+		} else {
+			cerror(self.peek().line, msg);
+			Err("Failed to consume!".to_string())
+		}
+	}
+
+	pub fn expression(&mut self) -> Result<Rc<Expr>, String> {
+		Ok(self.equality()?)
+	}
+
+	pub fn equality(&mut self) -> Result<Rc<Expr>, String> {
+		let mut expr = self.comparison()?;
 
 		while self.match_advance(&[TokenType::BangEqual, TokenType::EqualEqual]) {
 			let op = self.peek_prev();
-			let right = self.comparison();
+			let right = self.comparison()?;
 			expr = Expr::binary(expr, op.clone(), right);
 		}
-		expr
+		Ok(expr)
 	}
 
-	pub fn comparison(&mut self) -> Rc<Expr> {
-		let mut expr = self.term();
+	pub fn comparison(&mut self) -> Result<Rc<Expr>, String> {
+		let mut expr = self.term()?;
 
 		while self.match_advance(&[TokenType::Greater, TokenType::GreaterEqual,
 								   TokenType::Less, TokenType::LessEqual]) {
 			let op = self.peek_prev();
-			let right = self.term();
+			let right = self.term()?;
 			expr = Expr::binary(expr, op.clone(), right);
 		}
-		expr
+		Ok(expr)
 	}
 
-	pub fn term(&mut self) -> Rc<Expr> {
-		let mut expr = self.factor();
+	pub fn term(&mut self) -> Result<Rc<Expr>, String> {
+		let mut expr = self.factor()?;
 
 		while self.match_advance(&[TokenType::Minus, TokenType::Plus]) {
 			let op = self.peek_prev();
-			let right = self.factor();
+			let right = self.factor()?;
 			expr = Expr::binary(expr, op.clone(), right);
 		}
-		expr
+		Ok(expr)
 	}
 
-	pub fn factor(&mut self) -> Rc<Expr> {
-		let mut expr = self.unary();
+	pub fn factor(&mut self) -> Result<Rc<Expr>, String> {
+		let mut expr = self.unary()?;
 
 		while self.match_advance(&[TokenType::Slash, TokenType::Star]) {
 			let op = self.peek_prev();
-			let right = self.unary();
+			let right = self.unary()?;
 			expr = Expr::binary(expr, op.clone(), right);
 		}
-		expr
+		Ok(expr)
 	}
 
-	pub fn unary(&mut self) -> Rc<Expr> {
+	pub fn unary(&mut self) -> Result<Rc<Expr>, String> {
 		if self.match_advance(&[TokenType::Bang, TokenType::Minus]) {
 			let op = self.peek_prev();
-			let right = self.unary();
-			Expr::unary(op.clone(), right)
+			let right = self.unary()?;
+			Ok(Expr::unary(op.clone(), right))
 		} else {
-			self.primary()
+			Ok(self.primary()?)
 		}
 	}
 
-	pub fn primary(&mut self) -> Rc<Expr> {
+	pub fn primary(&mut self) -> Result<Rc<Expr>, String> {
 		// if self.is_at_end() { return false }
 		match self.advance().ttype {
-			TokenType::False => Expr::literal("false".to_string()),
-			TokenType::True => Expr::literal("true".to_string()),
-			TokenType::Nil => Expr::literal("nil".to_string()),
+			TokenType::False => Ok(Expr::literal("false".to_string())),
+			TokenType::True => Ok(Expr::literal("true".to_string())),
+			TokenType::Nil => Ok(Expr::literal("nil".to_string())),
 			TokenType::Number(_) | TokenType::StringLit(_) => {
-				Expr::literal(self.peek_prev().literal)
+				Ok(Expr::literal(self.peek_prev().literal))
 			},
 			TokenType::LeftParen => {
-				let mut expr = self.expression();
-				if !self.match_advance(&[TokenType::RightParen]) {
-					error(self.peek().line, "Something went wrong!");
-					Expr::literal("SOMETHING WENT WRONG".to_string())
-				} else {
-					Expr::grouping(expr)
-				}
+				let expr = self.expression()?;
+				self.consume(TokenType::RightParen, "Expected )!");
+				Ok(Expr::grouping(expr))
+				// if !self.match_advance(&[TokenType::RightParen]) {
+				// 	cerror(self.peek().line, "Something went wrong!");
+				// 	Expr::literal("SOMETHING WENT WRONG".to_string())
+				// } else {
+				// 	Expr::grouping(expr)
+				// }
 			},
 			_ => {
-				error(self.peek().line, "Something went wrong!");
-				Expr::literal("SOMETHING WENT WRONG".to_string())
+				cerror(self.peek().line, "Something went wrong!");
+				Err("Something went wrong!".to_string())
 			}
 		}
 	}

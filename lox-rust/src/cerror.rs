@@ -1,4 +1,4 @@
-pub fn error(line_n: u32, msg: &str) {
+pub fn cerror(line_n: u32, msg: &str) {
 	report(line_n, "", msg);
 }
 

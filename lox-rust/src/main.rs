@@ -4,7 +4,6 @@ mod parser;
 mod scanner;
 mod token;
 
-use cerror::error;
 use parser::Parser;
 use scanner::Scanner;
 // use token::{Token, TokenType};
@@ -29,7 +28,7 @@ fn main() {
   } else {
   	match run_prompt() {
   		Ok(_) => println!("Tot ziens"),
-  		Err(_) => error(0, "Something went wrong!")
+  		Err(_) => eprintln!("Something went wrong!")
   	}
   }
 }
@@ -66,7 +65,10 @@ fn run(source: String) {
 	// 	println!("{:?}", t);
 	// }
 	let mut parser = Parser::new(tokens);
-	println!("{:?}", parser.equality().to_string());
+	match parser.parse() {
+		Some(expr) => println!("{:?}", expr.to_string()),
+		None => println!("{:?}", "Parsing failed!")
+	}
 }
 
 
