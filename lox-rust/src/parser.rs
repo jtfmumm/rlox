@@ -138,8 +138,10 @@ impl Parser {
 			False => Ok(Expr::literal(Literal::Bool(false))),
 			True => Ok(Expr::literal(Literal::Bool(true))),
 			Nil => Ok(Expr::literal(Literal::Nil)),
-			Number(_) | TokenType::StringLit(_) => {
-				Ok(Expr::literal(Literal::Str(self.peek_prev().literal.clone())))
+			Number(n) => Ok(Expr::literal(Literal::Num(n))),
+			StringLit(_) => {
+				let s = self.peek_prev().literal.clone();
+				Ok(Expr::literal(Literal::Str(s)))
 			},
 			LeftParen => {
 				let expr = self.expression()?;

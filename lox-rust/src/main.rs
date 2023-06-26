@@ -69,7 +69,7 @@ fn run(source: String) -> Result<(), String> {
 	// 	Err(err) => println!("\nError: {:}", err)
 	// }
 	let expr = parser.parse()?;
-	match evaluate(expr) {
+	match evaluate(&*expr) {
 		Ok(lit) => { println!("{:?}", lit); Ok(()) },
 		Err(err) => { println!("\nError: {:}", err); Err("".to_string()) }
 	}
