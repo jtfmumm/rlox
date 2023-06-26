@@ -55,18 +55,27 @@ pub fn eval_binary(left: &Expr, operator: &Token, right: &Expr) -> Result<Litera
 	match &operator.ttype {
 		Minus => Ok(Num(as_num(l)? - as_num(r)?)),
 		// TODO: Handle concat for Strings! "3" + "rd"
-		Plus => Ok(Num(as_num(l)? + as_num(r)?)),
+		Plus => Ok(eval_plus(l, r)?),
 		Slash => Ok(Num(as_num(l)? / as_num(r)?)),
 		Star => Ok(Num(as_num(l)? * as_num(r)?)),
 		// TODO: In Lox you can compare different types, but
 		// that returns false.
-		// BangEqual => ,
-		// EqualEqual => ,
+		EqualEqual => Ok(Bool(is_equal(l, r))),
+		BangEqual => Ok(Bool(!is_equal(l, r))),
 		Greater => Ok(Bool(as_num(l)? > as_num(r)?)),
 		GreaterEqual => Ok(Bool(as_num(l)? >= as_num(r)?)),
 		Less => Ok(Bool(as_num(l)? < as_num(r)?)),
 		LessEqual => Ok(Bool(as_num(l)? <= as_num(r)?)),
 		tt => Err(everror(&format!("eval_binary: Invalid operator! {:?}", tt)))
+	}
+}
+
+fn eval_plus(l: Literal, r: Literal) -> Result<Literal, EvalError> {
+	use self::Literal::*;
+	match l {
+		Num(n) => Ok(Num(n + as_num(r)?)),
+		Str(s) => Ok(Str(s + &as_str(r)?)),
+		_ => Err(everror(&format!("eval_plus: Tried to add {:?} and {:?}!", l, r)))
 	}
 }
 
@@ -77,6 +86,17 @@ fn is_truthy(lit: Literal) -> bool {
 		Num(_) | Str(_) => true,
 		Nil => false,
 	}
+}
+
+fn is_equal(l: Literal, r: Literal) -> bool {
+	use self::Literal::*;
+	match (l, r) {
+		(Nil, Nil) => true,
+		(Num(n1), Num(n2)) => n1 == n2,
+		(Str(s1), Str(s2)) => s1 == s2,
+		(Bool(b1), Bool(b2)) => b1 == b2,
+		_ => false,
+ 	}
 }
 
 fn as_bool(lit: Literal) -> Result<bool, EvalError> {
@@ -95,7 +115,7 @@ fn as_num(lit: Literal) -> Result<f64, EvalError> {
 	}
 }
 
-fn as_string(lit: Literal) -> Result<String, EvalError> {
+fn as_str(lit: Literal) -> Result<String, EvalError> {
 	use self::Literal::*;
 	match lit {
 		Str(s) => Ok(s.to_owned()),
