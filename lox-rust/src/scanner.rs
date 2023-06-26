@@ -1,4 +1,4 @@
-use crate::cerror::cerror;
+use crate::cerror::scerror;
 use crate::token::{Token, TokenType};
 
 use std::mem;
@@ -100,14 +100,14 @@ impl Scanner {
 			d if d.is_digit(10) => self.scan_number(),
 			' ' | '\r' | '\t' => return,
 			'\n' => { self.line += 1; return },
-			_ => { cerror(self.line, "Unexpected character."); TokenType::Error }
+			_ => { scerror(self.line, "Unexpected character."); TokenType::Error }
 		};
 		self.add_token(token_type);
 	}
 
 	fn scan_string(&mut self) -> TokenType {
 		while !self.match_advance('"') {
-			if self.is_at_end() { cerror(self.line, "Unterminated string!"); return TokenType::Error }
+			if self.is_at_end() { scerror(self.line, "Unterminated string!"); return TokenType::Error }
 			self.current += 1
 		}
 		TokenType::StringLit(self.source_string[self.start + 1..self.current - 1].to_string())
@@ -130,7 +130,7 @@ impl Scanner {
 			self.current += 1
 		}
 		if self.match_advance('.') {
-			if !self.peek().is_digit(10) { cerror(self.line, "Number has trailing ."); return TokenType::Error }
+			if !self.peek().is_digit(10) { scerror(self.line, "Number has trailing ."); return TokenType::Error }
 			while self.peek().is_digit(10) {
 				self.current += 1;
 			}
@@ -168,7 +168,7 @@ impl Scanner {
 			"true" => TokenType::True,
 			"var" => TokenType::Var,
 			"while" => TokenType::While,
-			_ => { cerror(self.line, "Invalid keyword!"); TokenType::Error }
+			_ => { scerror(self.line, "Invalid keyword!"); TokenType::Error }
 		}
 	}
 }

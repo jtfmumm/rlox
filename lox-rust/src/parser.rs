@@ -1,8 +1,7 @@
-use crate::cerror::cerror;
+use crate::cerror::{perror, ParseError};
 use crate::expr::Expr;
 use crate::token::{Token, TokenType};
 
-use std::error::Error;
 use std::iter::Peekable;
 use std::rc::Rc;
 use std::vec::IntoIter;
@@ -18,15 +17,15 @@ impl Parser {
 		Parser { tokens: tokens.into_iter().peekable(), prev }
 	}
 
-	pub fn parse(&mut self) -> Result<Rc<Expr>, String> {
+	pub fn parse(&mut self) -> Result<Rc<Expr>, ParseError> {
 		self.expression()
 	}
 
-	fn peek(&mut self) -> Result<&Token, String> {
+	fn peek(&mut self) -> Result<&Token, ParseError> {
 		if let Some(t) = self.tokens.peek() {
 			Ok(t)
 		} else {
-			Err(cerror(self.prev.line, "Expected another token!"))
+			Err(perror(self.prev.line, self.prev.clone(), "Expected another token!"))
 		}
 	}
 
@@ -34,12 +33,12 @@ impl Parser {
 		&self.prev
 	}
 
-	fn advance(&mut self) -> Result<&Token, String> {
+	fn advance(&mut self) -> Result<&Token, ParseError> {
 		if let Some(t) = self.tokens.next().take() {
 			self.prev = t;
 			Ok(&self.prev)
 		} else {
-			Err(cerror(self.prev.line, "Expected another token!"))
+			Err(perror(self.prev.line, self.prev.clone(), "Expected another token!"))
 		}
 	}
 
@@ -57,20 +56,20 @@ impl Parser {
 		}).unwrap_or(false)
 	}
 
-	fn consume(&mut self, t: TokenType, msg: &str) -> Result<(), String> {
+	fn consume(&mut self, t: TokenType, msg: &str) -> Result<(), ParseError> {
 		if self.check(t) {
 			self.advance()?;
 			Ok(())
 		} else {
-			Err(cerror(self.peek()?.line, msg))
+			Err(perror(self.peek()?.line, self.peek()?.clone(), msg))
 		}
 	}
 
-	pub fn expression(&mut self) -> Result<Rc<Expr>, String> {
+	pub fn expression(&mut self) -> Result<Rc<Expr>, ParseError> {
 		Ok(self.equality()?)
 	}
 
-	pub fn equality(&mut self) -> Result<Rc<Expr>, String> {
+	pub fn equality(&mut self) -> Result<Rc<Expr>, ParseError> {
 		let mut expr = self.comparison()?;
 
 		while self.match_advance(&[TokenType::BangEqual, TokenType::EqualEqual]) {
@@ -81,7 +80,7 @@ impl Parser {
 		Ok(expr)
 	}
 
-	pub fn comparison(&mut self) -> Result<Rc<Expr>, String> {
+	pub fn comparison(&mut self) -> Result<Rc<Expr>, ParseError> {
 		let mut expr = self.term()?;
 
 		while self.match_advance(&[TokenType::Greater, TokenType::GreaterEqual,
@@ -93,7 +92,7 @@ impl Parser {
 		Ok(expr)
 	}
 
-	pub fn term(&mut self) -> Result<Rc<Expr>, String> {
+	pub fn term(&mut self) -> Result<Rc<Expr>, ParseError> {
 		let mut expr = self.factor()?;
 
 		while self.match_advance(&[TokenType::Minus, TokenType::Plus]) {
@@ -104,7 +103,7 @@ impl Parser {
 		Ok(expr)
 	}
 
-	pub fn factor(&mut self) -> Result<Rc<Expr>, String> {
+	pub fn factor(&mut self) -> Result<Rc<Expr>, ParseError> {
 		let mut expr = self.unary()?;
 
 		while self.match_advance(&[TokenType::Slash, TokenType::Star]) {
@@ -115,7 +114,7 @@ impl Parser {
 		Ok(expr)
 	}
 
-	pub fn unary(&mut self) -> Result<Rc<Expr>, String> {
+	pub fn unary(&mut self) -> Result<Rc<Expr>, ParseError> {
 		if self.match_advance(&[TokenType::Bang, TokenType::Minus]) {
 			let op = self.peek_prev().clone();
 			let right = self.unary()?;
@@ -125,7 +124,7 @@ impl Parser {
 		}
 	}
 
-	pub fn primary(&mut self) -> Result<Rc<Expr>, String> {
+	pub fn primary(&mut self) -> Result<Rc<Expr>, ParseError> {
 		match self.advance()?.ttype {
 			TokenType::False => Ok(Expr::literal("false".to_string())),
 			TokenType::True => Ok(Expr::literal("true".to_string())),
@@ -139,7 +138,7 @@ impl Parser {
 				Ok(Expr::grouping(expr))
 			},
 			_ => {
-				Err(cerror(self.peek()?.line, "Something went wrong!"))
+				Err(perror(self.peek()?.line, self.peek()?.clone(), "Something went wrong!"))
 			}
 		}
 	}
