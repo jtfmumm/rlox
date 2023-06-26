@@ -1,5 +1,6 @@
 use crate::cerror::{perror, ParseError};
 use crate::expr::Expr;
+use crate::literal::Literal;
 use crate::token::{Token, TokenType};
 
 use std::iter::Peekable;
@@ -17,8 +18,15 @@ impl Parser {
 		Parser { tokens: tokens.into_iter().peekable(), prev }
 	}
 
-	pub fn parse(&mut self) -> Result<Rc<Expr>, ParseError> {
-		self.expression()
+	pub fn parse(&mut self) -> Result<Rc<Expr>, String> {
+		match self.expression() {
+			Ok(expr) => Ok(expr),
+			// We need to handle syntax errors here.
+			Err(_) => {
+				// println!("\n{:}", err);
+				Err("Parsing failed!".to_string())
+			}
+		}
 	}
 
 	fn peek(&mut self) -> Result<&Token, ParseError> {
@@ -127,11 +135,11 @@ impl Parser {
 	pub fn primary(&mut self) -> Result<Rc<Expr>, ParseError> {
 		use crate::token::TokenType::*;
 		match self.advance()?.ttype {
-			False => Ok(Expr::literal("false".to_string())),
-			True => Ok(Expr::literal("true".to_string())),
-			Nil => Ok(Expr::literal("nil".to_string())),
+			False => Ok(Expr::literal(Literal::Bool(false))),
+			True => Ok(Expr::literal(Literal::Bool(true))),
+			Nil => Ok(Expr::literal(Literal::Nil)),
 			Number(_) | TokenType::StringLit(_) => {
-				Ok(Expr::literal(self.peek_prev().literal.clone()))
+				Ok(Expr::literal(Literal::Str(self.peek_prev().literal.clone())))
 			},
 			LeftParen => {
 				let expr = self.expression()?;
@@ -139,7 +147,7 @@ impl Parser {
 				Ok(Expr::grouping(expr))
 			},
 			_ => {
-				Err(perror(self.peek()?.line, self.peek()?.clone(), "Something went wrong!"))
+				Err(perror(self.peek()?.line, self.peek()?.clone(), "Expected expression!"))
 			}
 		}
 	}

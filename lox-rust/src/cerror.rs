@@ -19,6 +19,11 @@ pub fn perror(line_n: u32, token: Token, msg: &str) -> ParseError {
 	// msg.to_string()
 }
 
+pub fn everror(msg: &str) -> EvalError {
+	report(0, "", msg);
+	EvalError::new(msg)
+}
+
 pub fn report(line_n: u32, location: &str, msg: &str) {
 	eprintln!("[Line: {:}] Error {:}: {:}", line_n, location, msg);
 }
@@ -62,5 +67,24 @@ impl Error for ParseError {}
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "[Line {:}] Parse error at {:}: {:}", self.line, &self.location, &self.msg)
+    }
+}
+
+#[derive(Debug)]
+pub struct EvalError {
+	msg: String
+}
+
+impl EvalError {
+	pub fn new(msg: &str) -> Self {
+		EvalError { msg: msg.to_string() }
+	}
+}
+
+impl Error for EvalError {}
+
+impl fmt::Display for EvalError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Evaluation error: {:}", &self.msg)
     }
 }

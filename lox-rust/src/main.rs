@@ -1,9 +1,12 @@
 mod cerror;
 mod expr;
+mod evaluate;
+mod literal;
 mod parser;
 mod scanner;
 mod token;
 
+use evaluate::evaluate;
 use parser::Parser;
 use scanner::Scanner;
 
@@ -48,22 +51,27 @@ fn run_prompt() -> io::Result<()> {
 	    	s if s == exit_string => break,
 	    	_ => {}
 	    }
-	    run(user_input)
+	    run(user_input);
 	}
 
     Ok(())
 }
 
-fn run(source: String) {
+fn run(source: String) -> Result<(), String> {
 	let mut scanner = Scanner::new(source);
 	let tokens = scanner.scan_tokens();
 	// for t in &tokens {
 	// 	println!("{:?}", t);
 	// }
 	let mut parser = Parser::new(tokens);
-	match parser.parse() {
-		Ok(expr) => println!("{:}", expr.to_string()),
-		Err(perror) => println!("\n{:}\n{:}", "Parsing failed!", perror)
+	// match parser.parse() {
+	// 	Ok(expr) => println!("{:}", expr.to_string()),
+	// 	Err(err) => println!("\nError: {:}", err)
+	// }
+	let expr = parser.parse()?;
+	match evaluate(expr) {
+		Ok(lit) => { println!("{:?}", lit); Ok(()) },
+		Err(err) => { println!("\nError: {:}", err); Err("".to_string()) }
 	}
 }
 
