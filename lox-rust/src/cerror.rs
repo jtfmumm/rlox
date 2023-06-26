@@ -9,23 +9,40 @@ pub fn scerror(line_n: u32, msg: &str) -> ScannerError {
 }
 
 pub fn perror(line_n: u32, token: Token, msg: &str) -> ParseError {
-	let lexeme = token.lexeme.to_owned();
-	let location = match token.ttype {
-		TokenType::Eof => "end".to_string(),
-		_ => format!("'{:}'", lexeme)
-	};
+	// let lexeme = token.lexeme.to_owned();
+	// let location = match token.ttype {
+	// 	TokenType::Eof => "end".to_string(),
+	// 	_ => format!("'{:}'", lexeme)
+	// };
+	let location = location_for(&token);
 	report(line_n, &location, msg);
 	ParseError::new(line_n, &location, msg)
 	// msg.to_string()
 }
 
-pub fn everror(msg: &str) -> EvalError {
+pub fn everror(token: Token, msg: &str) -> EvalError {
+	let updated =
+// pub fn everror(msg: &str, token: Option<Token>) -> EvalError {
+	// let lexeme = token.lexeme.to_owned();
+	// let location = match token.ttype {
+	// 	TokenType::Eof => "end".to_string(),
+	// 	_ => format!("'{:}'", lexeme)
+	// };
 	report(0, "", msg);
 	EvalError::new(msg)
 }
 
 pub fn report(line_n: u32, location: &str, msg: &str) {
 	eprintln!("[Line: {:}] Error {:}: {:}", line_n, location, msg);
+}
+
+fn location_for(token: &Token) -> String {
+	let lexeme = token.lexeme.to_owned();
+	let location = match token.ttype {
+		TokenType::Eof => "end".to_string(),
+		_ => format!("'{:}'", lexeme)
+	};
+	location
 }
 
 #[derive(Debug)]
@@ -70,14 +87,50 @@ impl fmt::Display for ParseError {
     }
 }
 
-#[derive(Debug)]
-pub struct EvalError {
-	msg: String
+#[derive(Debug, PartialEq)]
+pub enum EvalError {
+	WithoutContext { msg: String },
+	WithContext { line: u32, location: String, msg: String }
 }
+// #[derive(Debug)]
+// pub struct EvalError {
+// 	// err: Option<EvalError>,
+// 	msg: String
+// }
 
 impl EvalError {
 	pub fn new(msg: &str) -> Self {
-		EvalError { msg: msg.to_string() }
+		EvalError::WithoutContext { msg: msg.to_string() }
+	}
+
+	// HACK: Has a non-obvious side effect by reporting
+	pub fn new_everror(token: Token, msg: &str) -> Self {
+		let location = location_for(&token);
+		report(token.line, &location, msg);
+		EvalError::WithContext { line: token.line, location, msg: msg.to_string() }
+	}
+
+	// HACK: Has a non-obvious side effect by reporting if context is updated
+	pub fn with_context(&self, token: Token) -> Self {
+		match self {
+			EvalError::WithoutContext { msg } => {
+				EvalError::new_everror(token, msg)
+			},
+			EvalError::WithContext { line, location, msg } => {
+				EvalError::WithContext { line: *line, location: location.clone(), msg: msg.clone() }
+			}
+		}
+	}
+
+	fn get_msg(&self) -> &str {
+		match self {
+			EvalError::WithoutContext { msg } => {
+				&msg
+			},
+			EvalError::WithContext { msg, .. } => {
+				&msg
+			}
+		}
 	}
 }
 
@@ -85,6 +138,6 @@ impl Error for EvalError {}
 
 impl fmt::Display for EvalError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Evaluation error: {:}", &self.msg)
+        write!(f, "Evaluation error: {:}", self.get_msg())
     }
 }

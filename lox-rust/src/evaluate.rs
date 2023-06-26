@@ -10,7 +10,12 @@ pub fn evaluate(expr: &Expr) -> Result<Literal, EvalError> {
 
 	match expr {
 		Binary { ref left, ref operator, ref right } => {
-			eval_binary(left, operator, right)
+			// eval_binary(left, operator, right)
+			let res = eval_binary(left, operator, right);
+			match res {
+				Ok(lit) => Ok(lit),
+				Err(everr) => Err(everr.with_context(operator.clone())),
+			}
 		},
 		Grouping { ref expression } => {
 			eval_grouping(expression)
@@ -26,6 +31,12 @@ pub fn evaluate(expr: &Expr) -> Result<Literal, EvalError> {
 		},
 		Unary { ref operator, ref right } => {
 			eval_unary(operator, right)
+			// match eval_unary(operator, right) {
+			// 	Ok(lit) => Ok(lit),
+			// 	Err(err) => {
+			// 		Err() <--- Add context info
+			// 	}
+			// }
 		},
 	}
 }
@@ -42,7 +53,7 @@ pub fn eval_unary(op: &Token, right: &Expr) -> Result<Literal, EvalError> {
 	match &op.ttype {
 		Minus => Ok(Num(-as_num(r)?)),
 		Bang => Ok(Bool(!(is_truthy(r)))),
-		tt => Err(everror(&format!("eval_unary: Invalid operator! {:?}", tt)))
+		tt => Err(EvalError::new(&format!("eval_unary: Invalid operator! {:?}", tt)))
 	}
 }
 
@@ -66,7 +77,7 @@ pub fn eval_binary(left: &Expr, operator: &Token, right: &Expr) -> Result<Litera
 		GreaterEqual => Ok(Bool(as_num(l)? >= as_num(r)?)),
 		Less => Ok(Bool(as_num(l)? < as_num(r)?)),
 		LessEqual => Ok(Bool(as_num(l)? <= as_num(r)?)),
-		tt => Err(everror(&format!("eval_binary: Invalid operator! {:?}", tt)))
+		tt => Err(EvalError::new(&format!("eval_binary: Invalid operator! {:?}", tt)))
 	}
 }
 
@@ -75,7 +86,7 @@ fn eval_plus(l: Literal, r: Literal) -> Result<Literal, EvalError> {
 	match l {
 		Num(n) => Ok(Num(n + as_num(r)?)),
 		Str(s) => Ok(Str(s + &as_str(r)?)),
-		_ => Err(everror(&format!("eval_plus: Tried to add {:?} and {:?}!", l, r)))
+		_ => Err(EvalError::new(&format!("eval_plus: Tried to add {:?} and {:?}!", l, r)))
 	}
 }
 
@@ -103,7 +114,7 @@ fn as_bool(lit: Literal) -> Result<bool, EvalError> {
 	use self::Literal::*;
 	match lit {
 		Bool(b) => Ok(b),
-		_ => Err(everror(&format!("Expected Boolean, got {:?}", lit)))
+		_ => Err(EvalError::new(&format!("Expected Boolean, got {:?}", lit)))
 	}
 }
 
@@ -111,7 +122,7 @@ fn as_num(lit: Literal) -> Result<f64, EvalError> {
 	use self::Literal::*;
 	match lit {
 		Num(n) => Ok(n),
-		_ => Err(everror(&format!("Expected number, got {:?}", lit)))
+		_ => Err(EvalError::new(&format!("Expected number, got {:?}", lit)))
 	}
 }
 
@@ -119,6 +130,6 @@ fn as_str(lit: Literal) -> Result<String, EvalError> {
 	use self::Literal::*;
 	match lit {
 		Str(s) => Ok(s.to_owned()),
-		_ => Err(everror(&format!("Expected String, got {:?}", lit)))
+		_ => Err(EvalError::new(&format!("Expected String, got {:?}", lit)))
 	}
 }
