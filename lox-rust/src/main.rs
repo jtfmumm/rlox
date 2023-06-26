@@ -6,16 +6,12 @@ mod token;
 
 use parser::Parser;
 use scanner::Scanner;
-// use token::{Token, TokenType};
 
-// use argparse::{ArgumentParser, StoreTrue};
-// use std::any::Any;
 use std::env;
 use std::fs;
 use std::io;
 use std::io::Write;
 use std::process;
-// use std::rc::Rc;
 
 fn main() {
   println!("\n");
@@ -66,8 +62,8 @@ fn run(source: String) {
 	// }
 	let mut parser = Parser::new(tokens);
 	match parser.parse() {
-		Some(expr) => println!("{:?}", expr.to_string()),
-		None => println!("{:?}", "Parsing failed!")
+		Ok(expr) => println!("{:?}", expr.to_string()),
+		Err(perror) => println!("{:?}\n{:?}", "Parsing failed!", perror)
 	}
 }
 

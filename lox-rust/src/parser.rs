@@ -6,6 +6,7 @@ use std::error::Error;
 use std::rc::Rc;
 
 pub struct Parser {
+// token_iter: std::iter::Peekable<std::slice::Iter<'a, Token<'a>>>,
 	tokens: Vec<Token>,
 	current: usize,
 }
@@ -16,14 +17,8 @@ impl Parser {
 		Parser { tokens, current }
 	}
 
-	pub fn parse(&mut self) -> Option<Rc<Expr>> {
-		match self.expression() {
-			Ok(expr) => Some(expr),
-			Err(perror) => {
-				println!("{:?}", perror);
-				None
-			}
-		}
+	pub fn parse(&mut self) -> Result<Rc<Expr>, String> {
+		self.expression()
 	}
 
 	fn is_at_end(&self) -> bool {
@@ -70,8 +65,7 @@ impl Parser {
 			self.advance();
 			Ok(())
 		} else {
-			cerror(self.peek().line, msg);
-			Err("Failed to consume!".to_string())
+			Err(cerror(self.peek().line, msg))
 		}
 	}
 
@@ -135,7 +129,9 @@ impl Parser {
 	}
 
 	pub fn primary(&mut self) -> Result<Rc<Expr>, String> {
-		// if self.is_at_end() { return false }
+		if self.is_at_end() {
+			return Err(cerror(self.peek().line, "Expected primary!"))
+		}
 		match self.advance().ttype {
 			TokenType::False => Ok(Expr::literal("false".to_string())),
 			TokenType::True => Ok(Expr::literal("true".to_string())),
@@ -147,16 +143,9 @@ impl Parser {
 				let expr = self.expression()?;
 				self.consume(TokenType::RightParen, "Expected )!");
 				Ok(Expr::grouping(expr))
-				// if !self.match_advance(&[TokenType::RightParen]) {
-				// 	cerror(self.peek().line, "Something went wrong!");
-				// 	Expr::literal("SOMETHING WENT WRONG".to_string())
-				// } else {
-				// 	Expr::grouping(expr)
-				// }
 			},
 			_ => {
-				cerror(self.peek().line, "Something went wrong!");
-				Err("Something went wrong!".to_string())
+				Err(cerror(self.peek().line, "Something went wrong!"))
 			}
 		}
 	}
