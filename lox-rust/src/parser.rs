@@ -125,14 +125,15 @@ impl Parser {
 	}
 
 	pub fn primary(&mut self) -> Result<Rc<Expr>, ParseError> {
+		use crate::token::TokenType::*;
 		match self.advance()?.ttype {
-			TokenType::False => Ok(Expr::literal("false".to_string())),
-			TokenType::True => Ok(Expr::literal("true".to_string())),
-			TokenType::Nil => Ok(Expr::literal("nil".to_string())),
-			TokenType::Number(_) | TokenType::StringLit(_) => {
+			False => Ok(Expr::literal("false".to_string())),
+			True => Ok(Expr::literal("true".to_string())),
+			Nil => Ok(Expr::literal("nil".to_string())),
+			Number(_) | TokenType::StringLit(_) => {
 				Ok(Expr::literal(self.peek_prev().literal.clone()))
 			},
-			TokenType::LeftParen => {
+			LeftParen => {
 				let expr = self.expression()?;
 				self.consume(TokenType::RightParen, "Expected )!")?;
 				Ok(Expr::grouping(expr))
@@ -140,6 +141,25 @@ impl Parser {
 			_ => {
 				Err(perror(self.peek()?.line, self.peek()?.clone(), "Something went wrong!"))
 			}
+		}
+	}
+
+	// Skip the remaining tokens in the current statemet
+	// and continue parsing the next statement.
+	fn synchronize(&mut self) -> Result<(), ParseError> {
+		self.advance()?;
+		use crate::token::TokenType::*;
+		loop {
+			if self.peek_prev().ttype == Semicolon {
+				return Ok(())
+			}
+
+			match self.peek()?.ttype {
+				Class | Fun | Var | For | If
+				| While | Print | Return => return Ok(()),
+				_ => {}
+			}
+			self.advance()?;
 		}
 	}
 }
