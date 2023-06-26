@@ -20,18 +20,6 @@ pub fn perror(line_n: u32, token: Token, msg: &str) -> ParseError {
 	// msg.to_string()
 }
 
-pub fn everror(token: Token, msg: &str) -> EvalError {
-	let updated =
-// pub fn everror(msg: &str, token: Option<Token>) -> EvalError {
-	// let lexeme = token.lexeme.to_owned();
-	// let location = match token.ttype {
-	// 	TokenType::Eof => "end".to_string(),
-	// 	_ => format!("'{:}'", lexeme)
-	// };
-	report(0, "", msg);
-	EvalError::new(msg)
-}
-
 pub fn report(line_n: u32, location: &str, msg: &str) {
 	eprintln!("[Line: {:}] Error {:}: {:}", line_n, location, msg);
 }

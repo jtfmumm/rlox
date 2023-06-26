@@ -1,9 +1,7 @@
-use crate::cerror::{everror, EvalError};
+use crate::cerror::EvalError;
 use crate::expr::Expr;
 use crate::literal::Literal;
 use crate::token::{Token, TokenType};
-
-use std::rc::Rc;
 
 pub fn evaluate(expr: &Expr) -> Result<Literal, EvalError> {
 	use Expr::*;

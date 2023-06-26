@@ -36,7 +36,7 @@ fn run_file(arg: &str) {
     let contents = fs::read_to_string(arg)
         .expect("Should have been able to read the file");
 
-	run(contents);
+	let _ = run(contents);
 }
 
 fn run_prompt() -> io::Result<()> {
@@ -51,7 +51,7 @@ fn run_prompt() -> io::Result<()> {
 	    	s if s == exit_string => break,
 	    	_ => {}
 	    }
-	    run(user_input);
+	    let _ = run(user_input);
 	}
 
     Ok(())

@@ -12,10 +12,10 @@ impl Token {
 		Token { ttype, lexeme, literal, line }
 	}
 
-	pub fn to_string(&self) -> String {
-		// format!("{:?} {:?}", self.ttype, self.lexeme/*, literal*/)
-		format!("{:}", self.lexeme/*, literal*/)
-	}
+	// pub fn to_string(&self) -> String {
+	// 	// format!("{:?} {:?}", self.ttype, self.lexeme/*, literal*/)
+	// 	format!("{:}", self.lexeme/*, literal*/)
+	// }
 }
 
 #[derive(Debug, PartialEq, Clone)]
