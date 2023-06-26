@@ -10,7 +10,6 @@ pub fn evaluate(expr: &Expr) -> Result<Literal, EvalError> {
 
 	match expr {
 		Binary { ref left, ref operator, ref right } => {
-			// eval_binary(left, operator, right)
 			let res = eval_binary(left, operator, right);
 			match res {
 				Ok(lit) => Ok(lit),
@@ -30,13 +29,11 @@ pub fn evaluate(expr: &Expr) -> Result<Literal, EvalError> {
 			})
 		},
 		Unary { ref operator, ref right } => {
-			eval_unary(operator, right)
-			// match eval_unary(operator, right) {
-			// 	Ok(lit) => Ok(lit),
-			// 	Err(err) => {
-			// 		Err() <--- Add context info
-			// 	}
-			// }
+			let res = eval_unary(operator, right);
+			match res {
+				Ok(lit) => Ok(lit),
+				Err(everr) => Err(everr.with_context(operator.clone())),
+			}
 		},
 	}
 }
