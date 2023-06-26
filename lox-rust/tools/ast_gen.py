@@ -70,7 +70,7 @@ for e in exprs:
 
 output += """\t// Visitor methods
 	fn parens(left: String, right: String) -> String {
-		format!("({:?} {:?} )", left, right)
+		format!("({:} {:})", left, right)
 	}
 
 	pub fn to_string(&self) -> String {
@@ -78,7 +78,7 @@ output += """\t// Visitor methods
 
 		match *self {
 			Binary { ref left, ref operator, ref right } => {
-				operator.to_string() + &Expr::parens(left.to_string(), right.to_string())
+				operator.to_string() + " " + &Expr::parens(left.to_string(), right.to_string())
 			},
 			Grouping { ref expression } => expression.to_string(),
 			Literal { ref value } => value.to_owned(),

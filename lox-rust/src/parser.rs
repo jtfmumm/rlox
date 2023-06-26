@@ -3,69 +3,66 @@ use crate::expr::Expr;
 use crate::token::{Token, TokenType};
 
 use std::error::Error;
+use std::iter::Peekable;
 use std::rc::Rc;
+use std::vec::IntoIter;
 
 pub struct Parser {
-// token_iter: std::iter::Peekable<std::slice::Iter<'a, Token<'a>>>,
-	tokens: Vec<Token>,
-	current: usize,
+	tokens: Peekable<IntoIter<Token>>,
+	prev: Token,
 }
 
 impl Parser {
 	pub fn new(tokens: Vec<Token>) -> Self {
-		let current = 0;
-		Parser { tokens, current }
+		let prev = Token::new(TokenType::Sof, "".to_string(), "".to_string(), 0);
+		Parser { tokens: tokens.into_iter().peekable(), prev }
 	}
 
 	pub fn parse(&mut self) -> Result<Rc<Expr>, String> {
 		self.expression()
 	}
 
-	fn is_at_end(&self) -> bool {
-		self.current >= self.tokens.len()
-	}
-
-	fn peek(&mut self) -> Token {
-		self.tokens[self.current].clone()
-	}
-
-	fn peek_prev(&mut self) -> Token {
-		self.tokens[self.current - 1].clone()
-	}
-
-	// fn peek_next(&mut self) -> Token {
-	// 	self.tokens[self.current + 1].clone()
-	// }
-
-	fn advance(&mut self) -> Token {
-		let t = self.tokens[self.current].clone();
-		self.current += 1;
-		t
-	}
-
-	fn match_advance(&mut self, ts: &[TokenType]) -> bool {
-		if self.is_at_end() { return false }
-
-		let cur_ttype = &self.peek().ttype;
-		if ts.iter().any(|tt| tt == cur_ttype) {
-			self.current += 1;
-			true
+	fn peek(&mut self) -> Result<&Token, String> {
+		if let Some(t) = self.tokens.peek() {
+			Ok(t)
 		} else {
-			false
+			Err(cerror(self.prev.line, "Expected another token!"))
 		}
 	}
 
-	fn check(&mut self, t: TokenType) -> bool {
-		if self.is_at_end() { return false }
-		self.peek().ttype == t
+	fn peek_prev(&self) -> &Token {
+		&self.prev
+	}
+
+	fn advance(&mut self) -> Result<&Token, String> {
+		if let Some(t) = self.tokens.next().take() {
+			self.prev = t;
+			Ok(&self.prev)
+		} else {
+			Err(cerror(self.prev.line, "Expected another token!"))
+		}
+	}
+
+	fn match_advance(&mut self, matches: &[TokenType]) -> bool {
+		let is_match = self.tokens.peek().map(|t| {
+				matches.iter().any(|mtt| *mtt == t.ttype)
+			}).unwrap_or(false);
+		if is_match { self.prev = self.tokens.next().take().unwrap(); }
+		is_match
+	}
+
+	fn check(&mut self, mtt: TokenType) -> bool {
+		self.tokens.peek().map(|t| {
+			t.ttype == mtt
+		}).unwrap_or(false)
 	}
 
 	fn consume(&mut self, t: TokenType, msg: &str) -> Result<(), String> {
 		if self.check(t) {
-			self.advance();
+			self.advance()?;
 			Ok(())
 		} else {
-			Err(cerror(self.peek().line, msg))
+			Err(cerror(self.peek()?.line, msg))
 		}
 	}
 
@@ -77,9 +74,9 @@ impl Parser {
 		let mut expr = self.comparison()?;
 
 		while self.match_advance(&[TokenType::BangEqual, TokenType::EqualEqual]) {
-			let op = self.peek_prev();
+			let op = self.peek_prev().clone();
 			let right = self.comparison()?;
-			expr = Expr::binary(expr, op.clone(), right);
+			expr = Expr::binary(expr, op, right);
 		}
 		Ok(expr)
 	}
@@ -89,9 +86,9 @@ impl Parser {
 
 		while self.match_advance(&[TokenType::Greater, TokenType::GreaterEqual,
 								   TokenType::Less, TokenType::LessEqual]) {
-			let op = self.peek_prev();
+			let op = self.peek_prev().clone();
 			let right = self.term()?;
-			expr = Expr::binary(expr, op.clone(), right);
+			expr = Expr::binary(expr, op, right);
 		}
 		Ok(expr)
 	}
@@ -100,9 +97,9 @@ impl Parser {
 		let mut expr = self.factor()?;
 
 		while self.match_advance(&[TokenType::Minus, TokenType::Plus]) {
-			let op = self.peek_prev();
+			let op = self.peek_prev().clone();
 			let right = self.factor()?;
-			expr = Expr::binary(expr, op.clone(), right);
+			expr = Expr::binary(expr, op, right);
 		}
 		Ok(expr)
 	}
@@ -111,41 +108,38 @@ impl Parser {
 		let mut expr = self.unary()?;
 
 		while self.match_advance(&[TokenType::Slash, TokenType::Star]) {
-			let op = self.peek_prev();
+			let op = self.peek_prev().clone();
 			let right = self.unary()?;
-			expr = Expr::binary(expr, op.clone(), right);
+			expr = Expr::binary(expr, op, right);
 		}
 		Ok(expr)
 	}
 
 	pub fn unary(&mut self) -> Result<Rc<Expr>, String> {
 		if self.match_advance(&[TokenType::Bang, TokenType::Minus]) {
-			let op = self.peek_prev();
+			let op = self.peek_prev().clone();
 			let right = self.unary()?;
-			Ok(Expr::unary(op.clone(), right))
+			Ok(Expr::unary(op, right))
 		} else {
 			Ok(self.primary()?)
 		}
 	}
 
 	pub fn primary(&mut self) -> Result<Rc<Expr>, String> {
-		if self.is_at_end() {
-			return Err(cerror(self.peek().line, "Expected primary!"))
-		}
-		match self.advance().ttype {
+		match self.advance()?.ttype {
 			TokenType::False => Ok(Expr::literal("false".to_string())),
 			TokenType::True => Ok(Expr::literal("true".to_string())),
 			TokenType::Nil => Ok(Expr::literal("nil".to_string())),
 			TokenType::Number(_) | TokenType::StringLit(_) => {
-				Ok(Expr::literal(self.peek_prev().literal))
+				Ok(Expr::literal(self.peek_prev().literal.clone()))
 			},
 			TokenType::LeftParen => {
 				let expr = self.expression()?;
-				self.consume(TokenType::RightParen, "Expected )!");
+				self.consume(TokenType::RightParen, "Expected )!")?;
 				Ok(Expr::grouping(expr))
 			},
 			_ => {
-				Err(cerror(self.peek().line, "Something went wrong!"))
+				Err(cerror(self.peek()?.line, "Something went wrong!"))
 			}
 		}
 	}

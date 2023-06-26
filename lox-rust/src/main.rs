@@ -62,7 +62,7 @@ fn run(source: String) {
 	// }
 	let mut parser = Parser::new(tokens);
 	match parser.parse() {
-		Ok(expr) => println!("{:?}", expr.to_string()),
+		Ok(expr) => println!("{:}", expr.to_string()),
 		Err(perror) => println!("{:?}\n{:?}", "Parsing failed!", perror)
 	}
 }
