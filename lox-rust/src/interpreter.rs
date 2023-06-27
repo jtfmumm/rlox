@@ -4,12 +4,26 @@ use crate::literal::Literal;
 
 use std::rc::Rc;
 
-pub fn interpret(expr: Rc<Expr>) {
-	match evaluate(&expr) {
-		Ok(lit) => println!("{}", stringify_result(lit)),
-		Err(_) => println!("\n\x1b[1;31merror\x1b[0m: could not interpret due to previous error") //println!("\nError: {:}", err)
+pub struct Interpreter {
+
+}
+
+impl Interpreter {
+	pub fn new() -> Self {
+		Interpreter {}
+	}
+
+	pub fn interpret(&mut self, expr: Rc<Expr>) -> Result<(),()> {
+		match evaluate(&expr) {
+			Ok(lit) => { println!("{}", stringify_result(lit)); Ok(()) },
+			Err(_) => {
+				println!("\n\x1b[1;31merror\x1b[0m: could not interpret due to previous error");
+				Err(())
+			}
+		}
 	}
 }
+
 
 fn stringify_result(lit: Literal) -> String {
 	let s = format!("{}", lit);

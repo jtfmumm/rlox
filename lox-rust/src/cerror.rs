@@ -16,7 +16,7 @@ pub fn perror(token: Token, msg: &str) -> ParseError {
 }
 
 pub fn report(line_n: u32, location: &str, msg: &str) {
-	eprintln!("[Line: {:}] Error {:}: {:}", line_n, location, msg);
+	eprintln!("\x1b[1;31m>>\x1b[0m[Line: {:}] {}: {:}", line_n, location, msg);
 }
 
 fn location_for(token: &Token) -> String {
@@ -83,17 +83,17 @@ impl EvalError {
 	}
 
 	// HACK: Has a non-obvious side effect by reporting
-	pub fn new_everror(token: Token, msg: &str) -> Self {
-		let location = location_for(&token);
+	pub fn new_everror(token: Token, expr_str: &str, msg: &str) -> Self {
+		let location = expr_str.to_string();//location_for(&token);
 		report(token.line, &location, msg);
 		EvalError::WithContext { line: token.line, location, token, msg: msg.to_string() }
 	}
 
 	// HACK: Has a non-obvious side effect by reporting if context is updated through new_everror
-	pub fn with_context(self, token: Token) -> Self {
+	pub fn with_context(self, token: Token, expr_str: &str) -> Self {
 		match self {
 			EvalError::WithoutContext { msg } => {
-				EvalError::new_everror(token, &msg)
+				EvalError::new_everror(token, expr_str, &msg)
 			},
 			_ => self
 		}

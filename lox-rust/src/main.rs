@@ -7,7 +7,7 @@ mod parser;
 mod scanner;
 mod token;
 
-use interpreter::interpret;
+use interpreter::Interpreter;
 use parser::Parser;
 use scanner::Scanner;
 
@@ -21,7 +21,7 @@ fn main() {
   println!("\n");
   let args: Vec<_> = env::args().collect();
   if args.len() > 2 {
-  	println!("Usage: jlox [script]");
+  	println!("Usage: rlox [script]");
   	process::exit(64);
   } else if args.len() == 2 {
   	run_file(&args[1]);
@@ -37,7 +37,10 @@ fn run_file(arg: &str) {
     let contents = fs::read_to_string(arg)
         .expect("Should have been able to read the file");
 
-	let _ = run(contents);
+	match run(contents) {
+		Ok(()) => {},
+		Err(()) => process::exit(70)
+	}
 }
 
 fn run_prompt() -> io::Result<()> {
@@ -58,13 +61,19 @@ fn run_prompt() -> io::Result<()> {
     Ok(())
 }
 
-fn run(source: String) {
+fn run(source: String) -> Result<(),()> {
 	let mut scanner = Scanner::new(source);
 	let tokens = scanner.scan_tokens();
 	let mut parser = Parser::new(tokens);
 	match parser.parse() {
-		Ok(expr) => interpret(expr),
-		Err(_) => println!("\n\x1b[1;31merror\x1b[0m: could not parse due to previous error") //println!("\nError: {:}", err)
+		Ok(expr) => {
+			let mut interpreter = Interpreter::new();
+			interpreter.interpret(expr)
+		},
+		Err(_) => {
+			println!("\n\x1b[1;31merror\x1b[0m: could not parse due to previous error");
+			Err(())
+		}
 	}
 }
 

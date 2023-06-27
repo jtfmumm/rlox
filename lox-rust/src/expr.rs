@@ -1,7 +1,10 @@
 use crate::literal::Literal;
 use crate::token::Token;
+
+use std::fmt;
 use std::rc::Rc;
 
+#[derive(Debug)]
 pub enum Expr {
 	Binary { left: Rc<Expr>, operator: Token, right: Rc<Expr> },
 	Grouping { expression: Rc<Expr> },
@@ -26,23 +29,25 @@ impl Expr {
 		Rc::new(Expr::Unary { operator, right })
 	}
 
-	// // Visitor methods
-	// fn parens(left: String, right: String) -> String {
-	// 	format!("({:} {:})", left, right)
-	// }
+	fn parens(left: String, right: String) -> String {
+		format!("({:} {:})", left, right)
+	}
+}
 
-	// pub fn to_string(&self) -> String {
-	// 	use Expr::*;
+impl fmt::Display for Expr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		use Expr::*;
 
-	// 	match *self {
-	// 		Binary { ref left, ref operator, ref right } => {
-	// 			operator.to_string() + " " + &Expr::parens(left.to_string(), right.to_string())
-	// 		},
-	// 		Grouping { ref expression } => expression.to_string(),
-	// 		Literal { ref value } => value.to_string(),
-	// 		Unary { ref operator, ref right } => {
-	// 			Expr::parens(operator.to_string(), right.to_string())
-	// 		},
-	// 	}
-	// }
+		let s = match *self {
+			Binary { ref left, ref operator, ref right } => {
+				operator.to_string() + " " + &Expr::parens(left.to_string(), right.to_string())
+			},
+			Grouping { ref expression } => expression.to_string(),
+			Literal { ref value } => value.to_string(),
+			Unary { ref operator, ref right } => {
+				Expr::parens(operator.to_string(), right.to_string())
+			},
+		};
+		write!(f, "{}", s)
+	}
 }

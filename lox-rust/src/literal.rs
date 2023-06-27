@@ -13,10 +13,9 @@ impl fmt::Display for Literal {
         use Literal::*;
         match self {
         	Nil => write!(f, "nil"),
-        	Str(s) => write!(f, "{}", s),
+        	Str(s) => write!(f, "\"{}\"", s),
         	Num(n) => write!(f, "{}", n),
         	Bool(b) => write!(f, "{}", b)
         }
-
     }
 }

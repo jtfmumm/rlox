@@ -11,7 +11,7 @@ pub fn evaluate(expr: &Expr) -> Result<Literal, EvalError> {
 			let res = eval_binary(left, operator, right);
 			match res {
 				Ok(lit) => Ok(lit),
-				Err(everr) => Err(everr.with_context(operator.clone())),
+				Err(everr) => Err(everr.with_context(operator.clone(), &expr.to_string())),
 			}
 		},
 		Grouping { ref expression } => {
@@ -30,7 +30,7 @@ pub fn evaluate(expr: &Expr) -> Result<Literal, EvalError> {
 			let res = eval_unary(operator, right);
 			match res {
 				Ok(lit) => Ok(lit),
-				Err(everr) => Err(everr.with_context(operator.clone())),
+				Err(everr) => Err(everr.with_context(operator.clone(), &expr.to_string())),
 			}
 		},
 	}
@@ -62,7 +62,7 @@ pub fn eval_binary(left: &Expr, operator: &Token, right: &Expr) -> Result<Litera
 		Minus => Ok(Num(as_num(l)? - as_num(r)?)),
 		// TODO: Handle concat for Strings! "3" + "rd"
 		Plus => Ok(eval_plus(l, r)?),
-		Slash => Ok(Num(as_num(l)? / as_num(r)?)),
+		Slash => Ok(eval_div(l, r)?),
 		Star => Ok(Num(as_num(l)? * as_num(r)?)),
 		EqualEqual => Ok(Bool(is_equal(l, r))),
 		BangEqual => Ok(Bool(!is_equal(l, r))),
@@ -81,6 +81,15 @@ fn eval_plus(l: Literal, r: Literal) -> Result<Literal, EvalError> {
 		Str(s) => Ok(Str(s + &as_str(r)?)),
 		_ => Err(EvalError::new(&format!("eval_plus: Tried to add {:?} and {:?}!", l, r)))
 	}
+}
+
+fn eval_div(l: Literal, r: Literal) -> Result<Literal, EvalError> {
+	let divisor = as_num(r)?;
+	if divisor == 0.0 {
+		return Err(EvalError::new(&format!("eval_div: Tried to divide by 0!")))
+	}
+	let res = as_num(l)? / divisor;
+	Ok(Literal::Num(res))
 }
 
 fn is_truthy(lit: Literal) -> bool {
