@@ -1,10 +1,12 @@
 mod cerror;
 mod expr;
+mod environment;
 mod evaluate;
 mod interpreter;
-mod literal;
+mod object;
 mod parser;
 mod scanner;
+mod stmt;
 mod token;
 
 use interpreter::Interpreter;
@@ -37,7 +39,8 @@ fn run_file(arg: &str) {
     let contents = fs::read_to_string(arg)
         .expect("Should have been able to read the file");
 
-	match run(contents) {
+	let mut interpreter = Interpreter::new(false);
+	match run(&mut interpreter, contents) {
 		Ok(()) => {},
 		Err(()) => process::exit(70)
 	}
@@ -45,6 +48,7 @@ fn run_file(arg: &str) {
 
 fn run_prompt() -> io::Result<()> {
     let exit_string = "x\n".to_string();
+	let mut interpreter = Interpreter::new(true);
 	loop {
 		print!("> ");
 		io::stdout().flush()?;
@@ -55,20 +59,22 @@ fn run_prompt() -> io::Result<()> {
 	    	s if s == exit_string => break,
 	    	_ => {}
 	    }
-	    let _ = run(user_input);
+	    let _ = run(&mut interpreter, user_input);
 	}
 
     Ok(())
 }
 
-fn run(source: String) -> Result<(),()> {
+fn run(interpreter: &mut Interpreter, source: String) -> Result<(),()> {
 	let mut scanner = Scanner::new(source);
 	let tokens = scanner.scan_tokens();
+	// for t in &tokens {
+	// 	println!("{:?}", t);
+	// }
 	let mut parser = Parser::new(tokens);
 	match parser.parse() {
-		Ok(expr) => {
-			let mut interpreter = Interpreter::new();
-			interpreter.interpret(expr)
+		Ok(stmts) => {
+			interpreter.interpret(stmts)
 		},
 		Err(_) => {
 			println!("\n\x1b[1;31merror\x1b[0m: could not parse due to previous error");

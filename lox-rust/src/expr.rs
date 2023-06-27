@@ -1,4 +1,4 @@
-use crate::literal::Literal;
+use crate::object::Object;
 use crate::token::Token;
 
 use std::fmt;
@@ -8,7 +8,8 @@ use std::rc::Rc;
 pub enum Expr {
 	Binary { left: Rc<Expr>, operator: Token, right: Rc<Expr> },
 	Grouping { expression: Rc<Expr> },
-	Literal { value: Literal },
+	Literal { value: Object },
+	Variable { name: String },
 	Unary { operator: Token, right: Rc<Expr> },
 }
 
@@ -21,8 +22,12 @@ impl Expr {
 		Rc::new(Expr::Grouping { expression })
 	}
 
-	pub fn literal(value: Literal) -> Rc<Expr> {
+	pub fn literal(value: Object) -> Rc<Expr> {
 		Rc::new(Expr::Literal { value })
+	}
+
+	pub fn variable(name: &str) -> Rc<Expr> {
+		Rc::new(Expr::Variable { name: name.to_string() })
 	}
 
 	pub fn unary(operator: Token, right: Rc<Expr>) -> Rc<Expr> {
@@ -44,6 +49,7 @@ impl fmt::Display for Expr {
 			},
 			Grouping { ref expression } => expression.to_string(),
 			Literal { ref value } => value.to_string(),
+			Variable { ref name } => name.to_string(),
 			Unary { ref operator, ref right } => {
 				Expr::parens(operator.to_string(), right.to_string())
 			},

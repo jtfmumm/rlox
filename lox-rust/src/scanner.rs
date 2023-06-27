@@ -3,8 +3,8 @@ use crate::token::{Token, TokenType};
 
 use std::mem;
 
-const KEYWORDS: [&'static str; 16] = ["and", "class", "else", "false", "fun", "for", "if",
-                     		 "nil", "or", "print", "return", "super", "this", "true",
+const KEYWORDS: [&'static str; 17] = ["and", "class", "else", "false", "fun", "for", "if",
+                     		 "nil", "or", "p", "print", "return", "super", "this", "true",
                      		 "var", "while"];
 
 pub struct Scanner {
@@ -155,6 +155,8 @@ impl Scanner {
 			"if" => TokenType::If,
 			"nil" => TokenType::Nil,
 			"or" => TokenType::Or,
+			// Save myself repl typing by adding a shortened print
+			"p" => TokenType::Print,
 			"print" => TokenType::Print,
 			"return" => TokenType::Return,
 			"super" => TokenType::Super,
