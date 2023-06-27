@@ -8,16 +8,11 @@ pub fn scerror(line_n: u32, msg: &str) -> ScannerError {
 	ScannerError::new(line_n, msg)
 }
 
-pub fn perror(line_n: u32, token: Token, msg: &str) -> ParseError {
-	// let lexeme = token.lexeme.to_owned();
-	// let location = match token.ttype {
-	// 	TokenType::Eof => "end".to_string(),
-	// 	_ => format!("'{:}'", lexeme)
-	// };
+pub fn perror(token: Token, msg: &str) -> ParseError {
 	let location = location_for(&token);
+	let line_n = token.line;
 	report(line_n, &location, msg);
-	ParseError::new(line_n, &location, msg)
-	// msg.to_string()
+	ParseError::new(line_n, &location, token, msg)
 }
 
 pub fn report(line_n: u32, location: &str, msg: &str) {
@@ -58,12 +53,13 @@ impl fmt::Display for ScannerError {
 pub struct ParseError {
 	line: u32,
 	location: String,
+	token: Token,
 	msg: String
 }
 
 impl ParseError {
-	pub fn new(line: u32, location: &str, msg: &str) -> Self {
-		ParseError { line, location: location.to_string(), msg: msg.to_string() }
+	pub fn new(line: u32, location: &str, token: Token, msg: &str) -> Self {
+		ParseError { line, location: location.to_string(), token, msg: msg.to_string() }
 	}
 }
 
@@ -78,13 +74,8 @@ impl fmt::Display for ParseError {
 #[derive(Debug, PartialEq)]
 pub enum EvalError {
 	WithoutContext { msg: String },
-	WithContext { line: u32, location: String, msg: String }
+	WithContext { line: u32, location: String, token: Token, msg: String }
 }
-// #[derive(Debug)]
-// pub struct EvalError {
-// 	// err: Option<EvalError>,
-// 	msg: String
-// }
 
 impl EvalError {
 	pub fn new(msg: &str) -> Self {
@@ -95,18 +86,16 @@ impl EvalError {
 	pub fn new_everror(token: Token, msg: &str) -> Self {
 		let location = location_for(&token);
 		report(token.line, &location, msg);
-		EvalError::WithContext { line: token.line, location, msg: msg.to_string() }
+		EvalError::WithContext { line: token.line, location, token, msg: msg.to_string() }
 	}
 
-	// HACK: Has a non-obvious side effect by reporting if context is updated
-	pub fn with_context(&self, token: Token) -> Self {
+	// HACK: Has a non-obvious side effect by reporting if context is updated through new_everror
+	pub fn with_context(self, token: Token) -> Self {
 		match self {
 			EvalError::WithoutContext { msg } => {
-				EvalError::new_everror(token, msg)
+				EvalError::new_everror(token, &msg)
 			},
-			EvalError::WithContext { line, location, msg } => {
-				EvalError::WithContext { line: *line, location: location.clone(), msg: msg.clone() }
-			}
+			_ => self
 		}
 	}
 

@@ -49,10 +49,6 @@ impl Scanner {
 		self.source[self.current]
 	}
 
-	// fn peek_next(&self) -> char {
-	// 	self.source[self.current + 1]
-	// }
-
 	fn match_advance(&mut self, m: char) -> bool {
 		if self.is_at_end() { return false }
 		if self.peek() == m {
@@ -138,8 +134,6 @@ impl Scanner {
 		let n = self.source_substr().parse::<f64>().unwrap();
 		TokenType::Number(n)
 	}
-	// // literals.,
-	// Number,
 
 	fn add_token(&mut self, ttype: TokenType) {
 		let s = self.source_substr();

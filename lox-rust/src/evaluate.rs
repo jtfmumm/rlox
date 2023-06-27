@@ -64,8 +64,6 @@ pub fn eval_binary(left: &Expr, operator: &Token, right: &Expr) -> Result<Litera
 		Plus => Ok(eval_plus(l, r)?),
 		Slash => Ok(Num(as_num(l)? / as_num(r)?)),
 		Star => Ok(Num(as_num(l)? * as_num(r)?)),
-		// TODO: In Lox you can compare different types, but
-		// that returns false.
 		EqualEqual => Ok(Bool(is_equal(l, r))),
 		BangEqual => Ok(Bool(!is_equal(l, r))),
 		Greater => Ok(Bool(as_num(l)? > as_num(r)?)),
@@ -94,6 +92,8 @@ fn is_truthy(lit: Literal) -> bool {
 	}
 }
 
+// In Lox you can compare different types, but
+// that returns false.
 fn is_equal(l: Literal, r: Literal) -> bool {
 	use self::Literal::*;
 	match (l, r) {

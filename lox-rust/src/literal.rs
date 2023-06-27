@@ -1,3 +1,4 @@
+use std::fmt;
 
 #[derive(Debug, Clone)]
 pub enum Literal {
@@ -7,13 +8,15 @@ pub enum Literal {
 	Bool(bool),
 }
 
-// impl Literal {
-// 	pub fn to_string(&self) -> String {
-// 		match self {
-// 			Literal::Nil => "nil".to_string(),
-// 			Literal::Str(s) => s.clone(),
-// 			Literal::Num(n) => n.to_string(),
-// 			Literal::Bool(b) => b.to_string(),
-// 		}
-// 	}
-// }
+impl fmt::Display for Literal {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use Literal::*;
+        match self {
+        	Nil => write!(f, "nil"),
+        	Str(s) => write!(f, "{}", s),
+        	Num(n) => write!(f, "{}", n),
+        	Bool(b) => write!(f, "{}", b)
+        }
+
+    }
+}

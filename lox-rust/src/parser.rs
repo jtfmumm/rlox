@@ -22,10 +22,7 @@ impl Parser {
 		match self.expression() {
 			Ok(expr) => Ok(expr),
 			// We need to handle syntax errors here.
-			Err(_) => {
-				// println!("\n{:}", err);
-				Err("Parsing failed!".to_string())
-			}
+			Err(_) => Err("Parsing failed!".to_string())
 		}
 	}
 
@@ -33,7 +30,7 @@ impl Parser {
 		if let Some(t) = self.tokens.peek() {
 			Ok(t)
 		} else {
-			Err(perror(self.prev.line, self.prev.clone(), "Expected another token!"))
+			Err(perror(self.prev.clone(), "Expected another token!"))
 		}
 	}
 
@@ -46,7 +43,7 @@ impl Parser {
 			self.prev = t;
 			Ok(&self.prev)
 		} else {
-			Err(perror(self.prev.line, self.prev.clone(), "Expected another token!"))
+			Err(perror(self.prev.clone(), "Expected another token!"))
 		}
 	}
 
@@ -69,7 +66,7 @@ impl Parser {
 			self.advance()?;
 			Ok(())
 		} else {
-			Err(perror(self.peek()?.line, self.peek()?.clone(), msg))
+			Err(perror(self.peek()?.clone(), msg))
 		}
 	}
 
@@ -141,7 +138,10 @@ impl Parser {
 			Number(n) => Ok(Expr::literal(Literal::Num(n))),
 			StringLit(_) => {
 				let s = self.peek_prev().literal.clone();
-				Ok(Expr::literal(Literal::Str(s)))
+				// TODO: Why does the StringLit string pick up quotes
+				// at beginning and end? I'm removing them here.
+				let s2 = s[1..s.len() - 1].to_string();
+				Ok(Expr::literal(Literal::Str(s2)))
 			},
 			LeftParen => {
 				let expr = self.expression()?;
@@ -149,7 +149,7 @@ impl Parser {
 				Ok(Expr::grouping(expr))
 			},
 			_ => {
-				Err(perror(self.peek()?.line, self.peek()?.clone(), "Expected expression!"))
+				Err(perror(self.peek()?.clone(), "Expected expression!"))
 			}
 		}
 	}
