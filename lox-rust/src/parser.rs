@@ -47,6 +47,8 @@ impl Parser {
 			self.print_statement()
 		} else if self.match_advance(&[TokenType::LeftBrace]) {
 			self.block()
+		} else if self.match_advance(&[TokenType::If]) {
+			self.if_statement()
 		} else if self.identifier_match() {
 			self.assign_statement()
 		} else {
@@ -93,6 +95,25 @@ impl Parser {
 		let expr = self.expression()?;
 		self.advance_end_of_statement();
 		Ok(Stmt::print(expr))
+	}
+
+	fn if_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
+		let mut conditionals = Vec::new();
+		let mut else_block = None;
+		loop {
+			let conditional = self.expression()?;
+			self.consume(TokenType::LeftBrace, "Expect blocks for conditional statements.");
+			let blk = self.block()?;
+			conditionals.push((conditional, blk));
+			if !self.match_advance(&[TokenType::Elif]) { break }
+		}
+		if self.match_advance(&[TokenType::Else]) {
+			self.consume(TokenType::LeftBrace, "Expect blocks for else statements.");
+			let blk = self.block()?;
+			else_block = Some(blk);
+		}
+		// self.advance_end_of_statement();
+		Ok(Stmt::ifstmt(Rc::new(conditionals), Rc::new(else_block)))
 	}
 
 	fn assign_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {

@@ -38,7 +38,7 @@ pub enum TokenType {
 	Identifier(String), StringLit(String), Number(f64),
 
 	// keywords.,
-	And, Class, Else, False, Fun, For, If, Nil, Or,
+	And, Class, Elif, Else, False, Fun, For, If, Nil, Or,
 	Print, Return, Super, This, True, Var, While,
 
 	Eof, Sof,

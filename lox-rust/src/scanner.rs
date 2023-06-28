@@ -3,9 +3,9 @@ use crate::token::{Token, TokenType};
 
 use std::mem;
 
-const KEYWORDS: [&'static str; 17] = ["and", "class", "else", "false", "fun", "for", "if",
-                     		 "nil", "or", "p", "print", "return", "super", "this", "true",
-                     		 "var", "while"];
+const KEYWORDS: [&'static str; 18] = ["and", "class", "elif", "else", "false", "fun", "for",
+							 "if", "nil", "or", "p", "print", "return", "super", "this",
+							 "true", "var", "while"];
 
 pub struct Scanner {
 	source_string: String,
@@ -172,6 +172,7 @@ impl Scanner {
 		match keyword {
 			"and" => TokenType::And,
 			"class" => TokenType::Class,
+			"elif" => TokenType::Elif,
 			"else" => TokenType::Else,
 			"false" => TokenType::False,
 			"fun" => TokenType::Fun,

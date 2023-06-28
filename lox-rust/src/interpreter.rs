@@ -76,6 +76,18 @@ impl Interpreter {
 					Err(())	=> Err(EvalError::new("Failed while evaluating block."))
 				}
 			},
+			IfStmt { conditionals, else_block } => {
+				for (c, blk) in conditionals.iter() {
+					if is_truthy(self.evaluate(c)?) {
+						return self.execute(blk.clone())
+					}
+				}
+				if let Some(blk) = &*else_block.clone() {
+					self.execute(blk.clone())
+				} else {
+					Ok(Object::Nil)
+				}
+			}
 		}
 	}
 
