@@ -4,7 +4,7 @@ use std::error::Error;
 use std::fmt;
 
 pub fn scerror(line_n: u32, msg: &str) -> ScannerError {
-	report(line_n, "", msg);
+	report(line_n, "Syntax error", msg);
 	ScannerError::new(line_n, msg)
 }
 

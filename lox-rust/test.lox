@@ -3,11 +3,14 @@
   print "Two statements.";
 }
 
+var min = 0;
+var max = 10;
+
 var average = (min + max) / 2;
 var cool = 34.2345124;
 
 var imAVariable = "here is my value";
-var iAmNil;
+//var iAmNil;
 
 // Once declared, you can, naturally, access and assign a variable using its name.
 
@@ -16,6 +19,7 @@ print breakfast; // "bagels".
 breakfast = "beignets";
 print breakfast; // "beignets".
 
+/*
 fun returnFunction() {
   var outside = "outside";
 
@@ -25,3 +29,4 @@ fun returnFunction() {
 
   return inner;
 }
+*/

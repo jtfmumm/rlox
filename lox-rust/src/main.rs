@@ -67,7 +67,7 @@ fn run_prompt() -> io::Result<()> {
 
 fn run(interpreter: &mut Interpreter, source: String) -> Result<(),()> {
 	let mut scanner = Scanner::new(source);
-	let tokens = scanner.scan_tokens();
+	let tokens = scanner.scan_tokens()?;
 	// for t in &tokens {
 	// 	println!("{:?}", t);
 	// }
