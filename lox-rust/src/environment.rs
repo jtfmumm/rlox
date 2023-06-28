@@ -16,8 +16,19 @@ impl Environment {
 		Environment { outer: None, env: HashMap::new() }
 	}
 
-	pub fn from_outer(outer: Rc<RefCell<Environment>>) -> Self {
+	fn from_outer(outer: Rc<RefCell<Environment>>) -> Self {
 		Environment { outer: Some(outer), env: HashMap::new() }
+	}
+
+	pub fn add_scope(outer: Rc<RefCell<Environment>>) -> Rc<RefCell<Environment>> {
+		Rc::new(RefCell::new(Environment::from_outer(outer)))
+	}
+
+	pub fn remove_scope(&self) -> Result<Rc<RefCell<Environment>>,EvalError> {
+	    match &self.outer {
+			Some(env) => Ok(env.clone()),
+			None => Err(EvalError::new("Tried to remove non-existent scope from environment!"))
+		}
 	}
 
 	pub fn declare(&mut self, name: &str, value: Object) -> Result<(), EvalError>  {

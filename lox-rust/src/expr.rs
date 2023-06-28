@@ -8,6 +8,7 @@ use std::rc::Rc;
 pub enum Expr {
 	Binary { left: Rc<Expr>, operator: Token, right: Rc<Expr> },
 	Grouping { expression: Rc<Expr> },
+	Block { expression: Rc<Expr> },
 	Literal { value: Object },
 	Variable { name: String },
 	Unary { operator: Token, right: Rc<Expr> },
@@ -20,6 +21,10 @@ impl Expr {
 
 	pub fn grouping(expression: Rc<Expr>) -> Rc<Expr> {
 		Rc::new(Expr::Grouping { expression })
+	}
+
+	pub fn block(expression: Rc<Expr>) -> Rc<Expr> {
+		Rc::new(Expr::Block { expression })
 	}
 
 	pub fn literal(value: Object) -> Rc<Expr> {
@@ -48,6 +53,7 @@ impl fmt::Display for Expr {
 				operator.to_string() + " " + &Expr::parens(left.to_string(), right.to_string())
 			},
 			Grouping { ref expression } => expression.to_string(),
+			Block { ref expression } => "{ ".to_string() + &expression.to_string() + " }",
 			Literal { ref value } => value.to_string(),
 			Variable { ref name } => name.to_string(),
 			Unary { ref operator, ref right } => {

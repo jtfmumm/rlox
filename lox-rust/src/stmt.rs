@@ -12,7 +12,8 @@ pub enum Stmt {
 	VarDeclStmt { variable: Rc<Expr>, value: Rc<Expr> },
 	AssignStmt { variable: Rc<Expr>, value: Rc<Expr> },
 	ExprStmt { expr: Rc<Expr> },
-	PrintStmt { expr: Rc<Expr> }
+	PrintStmt { expr: Rc<Expr> },
+	BlockStmt { stmts: Rc<Vec<Rc<Stmt>>> }
 }
 
 impl Stmt {
@@ -31,6 +32,10 @@ impl Stmt {
 	pub fn print(expr: Rc<Expr>) -> Rc<Stmt> {
 		Rc::new(Stmt::PrintStmt { expr })
 	}
+
+	pub fn block(stmts: Rc<Vec<Rc<Stmt>>>) -> Rc<Stmt> {
+		Rc::new(Stmt::BlockStmt { stmts })
+	}
 }
 
 impl fmt::Display for Stmt {
@@ -42,6 +47,14 @@ impl fmt::Display for Stmt {
 			AssignStmt { ref variable, ref value } => variable.to_string() + " = " + &value.to_string(),
 			ExprStmt { ref expr } => expr.to_string(),
 			PrintStmt { ref expr } => expr.to_string(),
+			BlockStmt { ref stmts } => {
+				let mut s = "".to_string();
+				for stmt in stmts.iter() {
+					s += &stmt.to_string();
+					s += ";\n";
+				}
+				s
+			}
 		};
 		write!(f, "{}", s)
 	}

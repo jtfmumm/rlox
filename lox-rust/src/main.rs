@@ -1,7 +1,6 @@
 mod cerror;
 mod expr;
 mod environment;
-mod evaluate;
 mod interpreter;
 mod object;
 mod parser;
@@ -36,6 +35,7 @@ fn main() {
 }
 
 fn run_file(arg: &str) {
+	println!("Running {:?}", arg);
     let contents = fs::read_to_string(arg)
         .expect("Should have been able to read the file");
 

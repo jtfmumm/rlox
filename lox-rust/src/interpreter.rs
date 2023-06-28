@@ -6,6 +6,7 @@ use crate::stmt::Stmt;
 use crate::token::{Token, TokenType};
 
 use std::cell::RefCell;
+use std::mem;
 use std::rc::Rc;
 
 pub struct Interpreter {
@@ -31,7 +32,7 @@ impl Interpreter {
 				},
 			}
 		}
-		if hit_error { Ok(()) } else { Err(()) }
+		if !hit_error { Ok(()) } else { Err(()) }
 	}
 
 	fn execute(&mut self, stmt: Rc<Stmt>) -> Result<Object, EvalError> {
@@ -65,6 +66,16 @@ impl Interpreter {
 				println!("{}", stringify_cli_result(&obj));
 				Ok(Object::Nil)
 			}
+			BlockStmt { stmts } => {
+				self.env = Environment::add_scope(self.env.clone());
+				match self.interpret(stmts.to_vec()) {
+					Ok(()) => {
+						self.env = self.env.clone().borrow().remove_scope()?;
+						Ok(Object::Nil)
+					},
+					Err(())	=> Err(EvalError::new("Failed while evaluating block."))
+				}
+			},
 		}
 	}
 
@@ -80,6 +91,9 @@ impl Interpreter {
 			},
 			Grouping { ref expression } => {
 				self.eval_grouping(expression)
+			},
+			Block { ref expression } => {
+				self.eval_block(expression)
 			},
 			Literal { ref value } => {
 				use self::Object::*;
@@ -106,6 +120,15 @@ impl Interpreter {
 
 	pub fn eval_grouping(&mut self, expr: &Expr) -> Result<Object, EvalError> {
 		self.evaluate(expr)
+	}
+
+	pub fn eval_block(&mut self, expr: &Expr) -> Result<Object, EvalError> {
+		// TODO: It seems this code will never run. I'll stick this here for now.
+		assert!(false);
+		self.env = Environment::add_scope(self.env.clone());
+		let obj = self.evaluate(expr);
+		self.env = self.env.clone().borrow().remove_scope()?;
+		obj
 	}
 
 	pub fn eval_unary(&mut self, op: &Token, right: &Expr) -> Result<Object, EvalError> {

@@ -21,13 +21,23 @@ impl Parser {
 
 	pub fn parse(&mut self) -> Result<Vec<Rc<Stmt>>, String> {//Result<Rc<Expr>, String> {
 		let mut stmts = Vec::new();
+		let mut failed = false;
 		while self.tokens.peek().unwrap().ttype != TokenType::Eof {
 			match self.statement() {
-				Ok(stmt) => stmts.push(stmt),
-				Err(_) => return Err("Parsing failed!".to_string())
+				Ok(stmt) => {
+					stmts.push(stmt);
+				},
+				Err(_) => {
+					failed = true;
+					self.synchronize();
+				}
 			}
 		}
-		Ok(stmts)
+		if failed {
+			Err("Parsing failed!".to_string())
+		} else {
+			Ok(stmts)
+		}
 	}
 
 	fn statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
@@ -35,10 +45,34 @@ impl Parser {
 			self.var_statement()
 		} else if self.match_advance(&[TokenType::Print]) {
 			self.print_statement()
+		} else if self.match_advance(&[TokenType::LeftBrace]) {
+			self.block()
 		} else if self.identifier_match() {
 			self.assign_statement()
 		} else {
 			self.expr_statement()
+		}
+	}
+
+	fn block(&mut self) -> Result<Rc<Stmt>, ParseError> {
+		let mut stmts = Vec::new();
+		let mut failed = false;
+
+		while !self.match_advance(&[TokenType::RightBrace]) {
+			match self.statement() {
+				Ok(stmt) => {
+					stmts.push(stmt);
+				},
+				Err(_) => {
+					failed = true;
+					self.synchronize();
+				}
+			}
+		}
+		if failed {
+			Err(perror(self.peek_prev().clone(), "Error while parsing block."))
+		} else {
+			Ok(Stmt::block(Rc::new(stmts)))
 		}
 	}
 
@@ -209,6 +243,9 @@ impl Parser {
 
 	fn primary(&mut self) -> Result<Rc<Expr>, ParseError> {
 		use crate::token::TokenType::*;
+		if self.check(TokenType::Semicolon) {
+			return Err(perror(self.peek()?.clone(), "Expect primary!"))
+		}
 		match &self.advance()?.ttype {
 			False => Ok(Expr::literal(Object::Bool(false))),
 			True => Ok(Expr::literal(Object::Bool(true))),
@@ -223,8 +260,13 @@ impl Parser {
 			},
 			LeftParen => {
 				let expr = self.expression()?;
-				self.consume(TokenType::RightParen, "Expected )!")?;
+				self.consume(TokenType::RightParen, "Expect )!")?;
 				Ok(Expr::grouping(expr))
+			},
+			LeftBrace => {
+				let expr = self.expression()?;
+				self.consume(TokenType::RightBrace, "Expect }!")?;
+				Ok(Expr::block(expr))
 			},
 			Identifier(name) => Ok(Expr::variable(&name)),
 			_ => {
