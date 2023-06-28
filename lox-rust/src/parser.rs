@@ -204,7 +204,30 @@ impl Parser {
 	}
 
 	fn expression(&mut self) -> Result<Rc<Expr>, ParseError> {
-		Ok(self.equality()?)
+		// TODO: Add assignment and remove it from the statement side of things.
+		Ok(self.logic_or()?)
+	}
+
+	fn logic_or(&mut self) -> Result<Rc<Expr>, ParseError> {
+		let mut expr = self.logic_and()?;
+
+		while self.match_advance(&[TokenType::Or]) {
+			let op = self.peek_prev().clone();
+			let right = self.logic_and()?;
+			expr = Expr::logic(expr, op, right);
+		}
+		Ok(expr)
+	}
+
+	fn logic_and(&mut self) -> Result<Rc<Expr>, ParseError> {
+		let mut expr = self.equality()?;
+
+		while self.match_advance(&[TokenType::And]) {
+			let op = self.peek_prev().clone();
+			let right = self.equality()?;
+			expr = Expr::logic(expr, op, right);
+		}
+		Ok(expr)
 	}
 
 	fn equality(&mut self) -> Result<Rc<Expr>, ParseError> {

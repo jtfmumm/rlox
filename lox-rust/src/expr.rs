@@ -7,6 +7,7 @@ use std::rc::Rc;
 #[derive(Debug)]
 pub enum Expr {
 	Binary { left: Rc<Expr>, operator: Token, right: Rc<Expr> },
+	Logic { left: Rc<Expr>, operator: Token, right: Rc<Expr> },
 	Grouping { expression: Rc<Expr> },
 	Block { expression: Rc<Expr> },
 	Literal { value: Object },
@@ -17,6 +18,10 @@ pub enum Expr {
 impl Expr {
 	pub fn binary(left: Rc<Expr>, operator: Token, right: Rc<Expr>) -> Rc<Expr> {
 		Rc::new(Expr::Binary { left, operator, right })
+	}
+
+	pub fn logic(left: Rc<Expr>, operator: Token, right: Rc<Expr>) -> Rc<Expr> {
+		Rc::new(Expr::Logic { left, operator, right })
 	}
 
 	pub fn grouping(expression: Rc<Expr>) -> Rc<Expr> {
@@ -50,6 +55,9 @@ impl fmt::Display for Expr {
 
 		let s = match *self {
 			Binary { ref left, ref operator, ref right } => {
+				operator.to_string() + " " + &Expr::parens(left.to_string(), right.to_string())
+			},
+			Logic { ref left, ref operator, ref right } => {
 				operator.to_string() + " " + &Expr::parens(left.to_string(), right.to_string())
 			},
 			Grouping { ref expression } => expression.to_string(),

@@ -78,7 +78,7 @@ impl Interpreter {
 			},
 			IfStmt { conditionals, else_block } => {
 				for (c, blk) in conditionals.iter() {
-					if is_truthy(self.evaluate(c)?) {
+					if is_truthy(&self.evaluate(c)?) {
 						return self.execute(blk.clone())
 					}
 				}
@@ -97,6 +97,12 @@ impl Interpreter {
 		match expr {
 			Binary { ref left, ref operator, ref right } => {
 				match self.eval_binary(left, operator, right) {
+					Ok(exp) => Ok(exp),
+					Err(everr) => Err(everr.with_context(operator.clone(), &expr.to_string())),
+				}
+			},
+			Logic { ref left, ref operator, ref right } => {
+				match self.eval_logic(left, operator, right) {
 					Ok(exp) => Ok(exp),
 					Err(everr) => Err(everr.with_context(operator.clone(), &expr.to_string())),
 				}
@@ -150,7 +156,7 @@ impl Interpreter {
 		use self::Object::*;
 		match &op.ttype {
 			Minus => Ok(Num(-as_num(r)?)),
-			Bang => Ok(Bool(!(is_truthy(r)))),
+			Bang => Ok(Bool(!(is_truthy(&r)))),
 			tt => Err(EvalError::new(&format!("eval_unary: Invalid operator! {:?}", tt)))
 		}
 	}
@@ -176,6 +182,17 @@ impl Interpreter {
 			tt => Err(EvalError::new(&format!("eval_binary: Invalid operator! {:?}", tt)))
 		}
 	}
+
+	pub fn eval_logic(&mut self, left: &Expr, operator: &Token, right: &Expr) -> Result<Object, EvalError> {
+		debug_assert!(operator.ttype == TokenType::And || operator.ttype == TokenType::Or);
+		let l = self.evaluate(left)?;
+
+		if operator.ttype == TokenType::And {
+			return Ok(if !is_truthy(&l) { l } else { self.evaluate(right)? })
+		} else {
+			return Ok(if !is_truthy(&l) { self.evaluate(right)? } else { l })
+		}
+	}
 }
 
 fn eval_plus(l: Object, r: Object) -> Result<Object, EvalError> {
@@ -197,10 +214,10 @@ fn eval_div(l: Object, r: Object) -> Result<Object, EvalError> {
 	Ok(Object::Num(res))
 }
 
-fn is_truthy(obj: Object) -> bool {
+fn is_truthy(obj: &Object) -> bool {
 	use self::Object::*;
 	match obj {
-		Bool(b) => b,
+		Bool(b) => *b,
 		Num(_) | Str(_) => true,
 		Nil => false,
 		// // TODO: Fix self!
