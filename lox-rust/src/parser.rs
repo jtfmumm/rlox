@@ -35,6 +35,8 @@ impl Parser {
 			self.var_statement()
 		} else if self.match_advance(&[TokenType::Print]) {
 			self.print_statement()
+		} else if self.identifier_match() {
+			self.assign_statement()
 		} else {
 			self.expr_statement()
 		}
@@ -45,7 +47,7 @@ impl Parser {
 			let variable = self.expression()?;
 			self.consume(TokenType::Equal, "Expect '=' for variable declaration.");
 			let value = self.expression()?;
-			self.consume(TokenType::Semicolon, "Expect ';' at end of statement.");
+			self.advance_end_of_statement();
 			Ok(Stmt::declare(variable, value))
 		} else {
 			Err(perror(self.tokens.peek().unwrap().clone(), "Expect identifier after var."))
@@ -55,13 +57,27 @@ impl Parser {
 
 	fn print_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
 		let expr = self.expression()?;
-		self.consume(TokenType::Semicolon, "Expect ';' at end of statement.");
+		self.advance_end_of_statement();
 		Ok(Stmt::print(expr))
+	}
+
+	fn assign_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
+		let expr = self.expression()?;
+
+		if self.match_advance(&[TokenType::Equal]) {
+			let value = self.expression()?;
+			self.advance_end_of_statement();
+			return Ok(Stmt::assign(expr, value))
+		}
+
+		// Not an assignment
+		self.advance_end_of_statement();
+		Ok(Stmt::expr(expr))
 	}
 
 	fn expr_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
 		let expr = self.expression()?;
-		self.consume(TokenType::Semicolon, "Expect ';' at end of statement.");
+		self.advance_end_of_statement();
 		Ok(Stmt::expr(expr))
 	}
 
@@ -94,6 +110,14 @@ impl Parser {
 		is_match
 	}
 
+	fn identifier_match(&mut self) -> bool {
+		self.tokens.peek().map(|t| {
+			match t.ttype {
+				TokenType::Identifier(_) => true,
+				_ => false
+			}}).unwrap_or(false)
+	}
+
 	fn check(&mut self, mtt: TokenType) -> bool {
 		self.tokens.peek().map(|t| {
 			t.ttype == mtt
@@ -118,6 +142,10 @@ impl Parser {
 		} else {
 			Err(perror(self.peek()?.clone(), msg))
 		}
+	}
+
+	fn advance_end_of_statement(&mut self) -> Result<(), ParseError> {
+		self.consume(TokenType::Semicolon, "Expect ';' at end of statement.")
 	}
 
 	fn expression(&mut self) -> Result<Rc<Expr>, ParseError> {
@@ -200,7 +228,7 @@ impl Parser {
 			},
 			Identifier(name) => Ok(Expr::variable(&name)),
 			_ => {
-				Err(perror(self.peek()?.clone(), "Supposed primary not found!"))
+				Err(perror(self.peek_prev().clone(), "Supposed primary not found!"))
 			}
 		}
 	}

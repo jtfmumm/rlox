@@ -42,10 +42,19 @@ impl Interpreter {
 					Expr::Variable { name } => {
 						let val = self.evaluate(&value)?;
 						self.env.borrow_mut().declare(name, val)?;
-						// println!("Assigning var {} the value {}", stringify_cli_result(&vble), stringify_cli_result(&val));
 						Ok(Object::Nil)
 					},
 					_ => Err(EvalError::new("Expect declaration to declare variable."))
+				}
+			},
+			AssignStmt { variable, value } => {
+				match &*variable.clone() {
+					Expr::Variable { name } => {
+						let val = self.evaluate(&value)?;
+						self.env.borrow_mut().assign(name, val)?;
+						Ok(Object::Nil)
+					},
+					_ => Err(EvalError::new("Expect assignment to assign to variable."))
 				}
 			},
 			ExprStmt { expr } => {
