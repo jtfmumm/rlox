@@ -10,7 +10,8 @@ pub enum LoxError {
 }
 
 pub fn scerror(line_n: u32, msg: &str) -> ScannerError {
-	report(line_n, "Syntax error", msg);
+	eprintln!("[line {}] Error: {}\n", line_n, msg);
+	// report(line_n, "Syntax error", msg);
 	ScannerError::new(msg)
 }
 
@@ -85,50 +86,69 @@ impl fmt::Display for ParseError {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum EvalError {
-	WithoutContext { msg: String },
-	WithContext { line: u32, location: String, token: Token, msg: String }
+pub struct EvalError {
+	msg: String
+	// WithoutContext { msg: String },
+	// WithContext { line: u32, location: String, token: Token, msg: String }
 }
 
 impl EvalError {
 	pub fn new(msg: &str) -> Self {
-		EvalError::WithoutContext { msg: msg.to_string() }
+		EvalError { msg: msg.to_string() }
+		// EvalError::WithoutContext { msg: msg.to_string() }
+	}
+
+	pub fn new_with_context(token: Token, expr_str: &str, msg: &str) -> Self {
+		let location = expr_str.to_string();//location_for(&token);
+		let msg = format!("[line {}] Error at {}: {}", token.line, location, msg);
+		EvalError { msg }
+		// EvalError::WithContext { line: token.line, location, token, msg: msg.to_string() }
+	}
+
+	pub fn with_context(self, token: Token, expr_str: &str) -> Self {
+		let location = expr_str.to_string();
+		let msg = self.msg + &format!("\n[line {}] Error at {}", token.line, location);
+		EvalError { msg }
+	}
+
+	pub fn report(&self) {
+		eprintln!("{}\n", self.msg);
 	}
 
 	// HACK: Has a non-obvious side effect by reporting
-	pub fn new_everror(token: Token, expr_str: &str, msg: &str) -> Self {
-		let location = expr_str.to_string();//location_for(&token);
+	// pub fn new_everror(token: Token, expr_str: &str, msg: &str) -> Self {
+	// 	let location = expr_str.to_string();//location_for(&token);
 
-		report(token.line, &location, msg);
-		EvalError::WithContext { line: token.line, location, token, msg: msg.to_string() }
-	}
+	// 	report(token.line, &location, msg);
+	// 	EvalError::WithContext { line: token.line, location, token, msg: msg.to_string() }
+	// }
 
 	// HACK: Has a non-obvious side effect by reporting if context is updated through new_everror
-	pub fn with_context(self, token: Token, expr_str: &str) -> Self {
-		match self {
-			EvalError::WithoutContext { msg } => {
-				EvalError::new_everror(token, expr_str, &msg)
-			},
-			_ => self
-		}
-	}
+	// pub fn with_context(self, token: Token, expr_str: &str) -> Self {
+	// 	match self {
+	// 		EvalError::WithoutContext { msg } => {
+	// 			EvalError::new_everror(token, expr_str, &msg)
+	// 		},
+	// 		_ => self
+	// 	}
+	// }
 
-	fn get_msg(&self) -> &str {
-		match self {
-			EvalError::WithoutContext { msg } => {
-				&msg
-			},
-			EvalError::WithContext { msg, .. } => {
-				&msg
-			}
-		}
-	}
+	// fn get_msg(&self) -> &str {
+	// 	match self {
+	// 		EvalError::WithoutContext { msg } => {
+	// 			&msg
+	// 		},
+	// 		EvalError::WithContext { msg, .. } => {
+	// 			&msg
+	// 		}
+	// 	}
+	// }
 }
 
 impl Error for EvalError {}
 
 impl fmt::Display for EvalError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Evaluation error: {:}", self.get_msg())
+        write!(f, "{}", self.msg)
     }
 }

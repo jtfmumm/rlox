@@ -32,13 +32,8 @@ impl Interpreter {
 					}
 				},
 				Err(err) => {
-					match err {
-						EvalError::WithoutContext { msg } => {
-							eprintln!("{}", msg);
-						},
-						EvalError::WithContext { .. } => {}
-					}
-					hit_error = true // println!("\n\x1b[1;31merror\x1b[0m: could not interpret due to previous error");
+					err.report();
+					hit_error = true;
 				}
 			}
 		}
@@ -187,7 +182,12 @@ impl Interpreter {
 		use self::Object::*;
 		match &op.ttype {
 			Bang => Ok(Bool(!(is_truthy(&r)))),
-			Minus => Ok(Num(-as_num(r)?)),
+			Minus => {
+				match r {
+					Num(n) => Ok(Num(-n)),
+					_ => Err(EvalError::new("Operand must be a number."))
+				}
+			}
 			tt => Err(EvalError::new(&format!("eval_unary: Invalid operator! {:?}", tt)))
 		}
 	}

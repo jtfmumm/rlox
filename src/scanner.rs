@@ -127,7 +127,7 @@ impl Scanner {
 
 	fn scan_string(&mut self) -> TokenType {
 		while !self.match_advance('"') {
-			if self.is_at_end() { self.report_error("Unterminated string!"); return TokenType::Error }
+			if self.is_at_end() { self.report_error("Unterminated string."); return TokenType::Error }
 			self.current += 1
 		}
 		TokenType::StringLit(self.source_string[self.start + 1..self.current - 1].to_string())

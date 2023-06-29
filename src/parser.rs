@@ -23,7 +23,7 @@ impl Parser {
 		let mut stmts = Vec::new();
 		let mut failed = false;
 		while self.tokens.peek().unwrap().ttype != TokenType::Eof {
-			match self.statement() {
+			match self.declaration() {
 				Ok(stmt) => {
 					stmts.push(stmt);
 				},
@@ -32,6 +32,7 @@ impl Parser {
 					let _ = self.synchronize();
 				}
 			}
+			if self.tokens.peek().is_none() { break }
 		}
 		if failed {
 			Err(LoxError::Parse)
@@ -40,12 +41,20 @@ impl Parser {
 		}
 	}
 
-	fn statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
+	fn declaration(&mut self) -> Result<Rc<Stmt>, ParseError> {
 		if self.match_advance(&[TokenType::Var]) {
 			self.var_statement()
-		} else if self.match_advance(&[TokenType::Print]) {
+		} else {
+			self.statement()
+		}
+	}
+
+	fn statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
+		// if self.match_advance(&[TokenType::Var]) {
+		// 	self.var_statement()
+		if self.match_advance(&[TokenType::Print]) {
 			self.print_statement()
-		} else if self.match_advance(&[TokenType::LeftBrace]) {
+		} else if self.check(&[TokenType::LeftBrace]) {
 			self.block()
 		} else if self.match_advance(&[TokenType::If]) {
 			self.if_statement()
@@ -64,7 +73,7 @@ impl Parser {
 
 		if self.match_advance(&[TokenType::LeftBrace]) {
 			while !self.match_advance(&[TokenType::RightBrace]) {
-				match self.statement() {
+				match self.declaration() {
 					Ok(stmt) => {
 						stmts.push(stmt);
 					},
@@ -90,7 +99,7 @@ impl Parser {
 		let init = if self.match_advance(&[TokenType::Semicolon]) {
 			None
 		} else {
-			Some(self.statement()?)
+			Some(self.declaration()?)
 		};
 		let condition = if self.match_advance(&[TokenType::Semicolon]) {
 			None
@@ -103,7 +112,7 @@ impl Parser {
 			None
 		} else {
 			let expr = Some(self.expression()?);
-			self.consume(TokenType::RightParen, "Expect ) for condition.")?;
+			self.consume(TokenType::RightParen, "Expect ) for end of for.")?;
 			expr
 		};
 		// self.consume(TokenType::LeftBrace, "Expect blocks for conditional statements.")?;
@@ -123,15 +132,11 @@ impl Parser {
 				}
 				_ => return Err(perror(self.peek_prev().clone(), "Invalid declaration"))
 			};
-			// if self.match_advance(&[TokenType::Equal]) {
-			// 	value = self.expression()?;
-			// }
 			self.advance_end_of_statement()?;
 			Ok(Stmt::var_decl_stmt(vr, vl))
 		} else {
 			Err(perror(self.tokens.peek().unwrap().clone(), "Expect variable name."))
 		}
-
 	}
 
 	fn print_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
@@ -154,8 +159,8 @@ impl Parser {
 		}
 		if self.match_advance(&[TokenType::Else]) {
 			// self.consume(TokenType::LeftBrace, "Expect blocks for else statements.")?;
-			let blk = self.block()?;
-			else_block = Some(blk);
+			let stmt = self.statement()?;
+			else_block = Some(stmt);
 		}
 		// self.advance_end_of_statement()?;
 		Ok(Stmt::if_stmt(Rc::new(conditionals), Rc::new(else_block)))
@@ -215,9 +220,7 @@ impl Parser {
 	}
 
 	fn match_advance(&mut self, matches: &[TokenType]) -> bool {
-		let is_match = self.tokens.peek().map(|t| {
-				matches.iter().any(|mtt| *mtt == t.ttype)
-			}).unwrap_or(false);
+		let is_match = self.check(matches);
 		if is_match { self.prev = self.tokens.next().take().unwrap(); }
 		is_match
 	}
@@ -230,9 +233,9 @@ impl Parser {
 	// 		}}).unwrap_or(false)
 	// }
 
-	fn check(&mut self, mtt: TokenType) -> bool {
+	fn check(&mut self, matches: &[TokenType]) -> bool {
 		self.tokens.peek().map(|t| {
-			t.ttype == mtt
+			matches.iter().any(|mtt| *mtt == t.ttype)
 		}).unwrap_or(false)
 	}
 
@@ -248,7 +251,7 @@ impl Parser {
 	}
 
 	fn consume(&mut self, t: TokenType, msg: &str) -> Result<(), ParseError> {
-		if self.check(t) {
+		if self.check(&[t]) {
 			self.advance()?;
 			Ok(())
 		} else {
@@ -257,7 +260,7 @@ impl Parser {
 	}
 
 	fn advance_end_of_statement(&mut self) -> Result<(), ParseError> {
-		self.consume(TokenType::Semicolon, "Expect ';' at end of statement.")
+		self.consume(TokenType::Semicolon, "Expect ';' after expression.")
 	}
 
 	fn expression(&mut self) -> Result<Rc<Expr>, ParseError> {
@@ -288,15 +291,15 @@ impl Parser {
 	}
 
 	fn assignment(&mut self) -> Result<Rc<Expr>, ParseError> {
-		let expr = self.equality()?;
+		let mut expr = self.equality()?;
 
 		if self.match_advance(&[TokenType::Equal]) {
 			match &*expr.clone() {
 				Expr::Variable { .. } => {},
 				_ => return Err(perror(self.peek_prev().clone(), "Invalid assignment target."))
 			}
-			let value = self.equality()?;
-			return Ok(Expr::assign(expr, value))
+			let value = self.expression()?;
+			expr = Expr::assign(expr, value)
 		}
 		Ok(expr)
 	}
@@ -358,7 +361,7 @@ impl Parser {
 
 	fn primary(&mut self) -> Result<Rc<Expr>, ParseError> {
 		use crate::token::TokenType::*;
-		if self.check(TokenType::Semicolon) {
+		if self.check(&[TokenType::Semicolon]) {
 			return Err(perror(self.peek()?.clone(), "Expect expression."))
 		}
 		match &self.advance()?.ttype {
@@ -385,7 +388,7 @@ impl Parser {
 			},
 			Identifier(name) => Ok(Expr::variable(name.clone())),
 			_ => {
-				Err(perror(self.peek_prev().clone(), "Supposed primary not found!"))
+				Err(perror(self.peek_prev().clone(), "Expect expression."))
 			}
 		}
 	}
@@ -400,11 +403,15 @@ impl Parser {
 				return Ok(())
 			}
 
-			match self.peek()?.ttype {
-				Class | Fun | Var | For | If
-				| While | Print | Return => return Ok(()),
-				_ => {}
+			if self.check(&[Eof, Class, Fun, Var, For, If, While, Print, Return]) {
+				return Ok(())
 			}
+
+			// match self.peek()?.ttype {
+			// 	Class | Fun | Var | For | If
+			// 	| While | Print | Return => return Ok(()),
+			// 	_ => {}
+			// }
 			self.advance()?;
 		}
 	}
