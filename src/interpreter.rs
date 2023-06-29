@@ -1,4 +1,4 @@
-use crate::cerror::EvalError;
+use crate::cerror::{EvalError, LoxError};
 use crate::environment::Environment;
 use crate::expr::Expr;
 use crate::object::{Object, stringify_cli_result};
@@ -6,6 +6,7 @@ use crate::stmt::Stmt;
 use crate::token::{Token, TokenType};
 
 use std::cell::RefCell;
+use std::error::Error;
 use std::mem;
 use std::rc::Rc;
 
@@ -15,24 +16,35 @@ pub struct Interpreter {
 }
 
 impl Interpreter {
-	pub fn new(is_repl: bool) -> Self {
-		Interpreter { is_repl, env: Rc::new(RefCell::new(Environment::new())) }
+	pub fn new() -> Self {
+		Interpreter { is_repl: false, env: Rc::new(RefCell::new(Environment::new())) }
 	}
 
-	pub fn interpret(&mut self, stmts: Vec<Rc<Stmt>>) -> Result<(),()> {
+	pub fn repl(&mut self) {
+		self.is_repl = true;
+	}
+
+	pub fn interpret(&mut self, stmts: Vec<Rc<Stmt>>) -> Result<(),LoxError> {
 		let mut hit_error = false;
 		for stmt in stmts {
 			match self.execute(stmt) {
 				Ok(lit) => {
-					if self.is_repl { println!("val: {}", stringify_cli_result(&lit)); }
+					if self.is_repl {
+						println!("val: {}", stringify_cli_result(&lit));
+					}
 				},
-				Err(_) => {
-					println!("\n\x1b[1;31merror\x1b[0m: could not interpret due to previous error");
-					hit_error = true;
-				},
+				Err(err) => {
+					match err {
+						EvalError::WithoutContext { msg } => {
+							eprintln!("{}", msg);
+						},
+						EvalError::WithContext { .. } => {}
+					}
+					hit_error = true // println!("\n\x1b[1;31merror\x1b[0m: could not interpret due to previous error");
+				}
 			}
 		}
-		if !hit_error { Ok(()) } else { Err(()) }
+		if hit_error { Err(LoxError::Runtime) } else { Ok(()) }
 	}
 
 	fn execute(&mut self, stmt: Rc<Stmt>) -> Result<Object, EvalError> {
@@ -55,7 +67,7 @@ impl Interpreter {
 						self.env.borrow_mut().assign(name, val)?;
 						Ok(Object::Nil)
 					},
-					_ => Err(EvalError::new("Expect assignment to assign to variable."))
+					_ => Err(EvalError::new("Invalid assignment target."))
 				}
 			},
 			ExprStmt { expr } => {
@@ -73,8 +85,14 @@ impl Interpreter {
 						self.env = self.env.clone().borrow().remove_scope()?;
 						Ok(Object::Nil)
 					},
-					Err(())	=> Err(EvalError::new("Failed while evaluating block."))
+					Err(err) => Err(EvalError::new("Failed while evaluating block."))
 				}
+			},
+			WhileStmt { condition, block } => {
+				while is_truthy(&self.evaluate(condition)?) {
+					self.execute(block.clone())?;
+				}
+				Ok(Object::Nil)
 			},
 			IfStmt { conditionals, else_block } => {
 				for (c, blk) in conditionals.iter() {
@@ -197,18 +215,26 @@ impl Interpreter {
 
 fn eval_plus(l: Object, r: Object) -> Result<Object, EvalError> {
 	use self::Object::*;
+	let err = Err(EvalError::new("Operands must be two numbers or two strings."));
 	match l {
-		Num(n) => Ok(Num(n + as_num(r)?)),
-		Str(s) => Ok(Str(s + &as_str(r)?)),
-		// TODO: Fix variable case
-		_ => Err(EvalError::new(&format!("eval_plus: Tried to add {:?} and {:?}!", l, r)))
+		Num(n) => {
+			let n2 = as_num(r);
+			if n2.is_err() { return err }
+			Ok(Num(n + n2.unwrap()))
+		},
+		Str(s) => {
+			let s2 = &as_str(r);
+			if s2.is_err() { return err }
+			Ok(Str(s + &s2.as_ref().unwrap()))
+		},
+		_ => err
 	}
 }
 
 fn eval_div(l: Object, r: Object) -> Result<Object, EvalError> {
 	let divisor = as_num(r)?;
-	if divisor == 0.0 {
-		return Err(EvalError::new(&format!("eval_div: Tried to divide by 0!")))
+	if divisor == 0.0  {
+		return Err(EvalError::new(&format!("Tried to divide by 0!")))
 	}
 	let res = as_num(l)? / divisor;
 	Ok(Object::Num(res))
@@ -220,8 +246,6 @@ fn is_truthy(obj: &Object) -> bool {
 		Bool(b) => *b,
 		Num(_) | Str(_) => true,
 		Nil => false,
-		// // TODO: Fix self!
-		// Variable { .. } => false
 	}
 }
 
@@ -234,7 +258,6 @@ fn is_equal(l: Object, r: Object) -> bool {
 		(Num(n1), Num(n2)) => n1 == n2,
 		(Str(s1), Str(s2)) => s1 == s2,
 		(Bool(b1), Bool(b2)) => b1 == b2,
-		// TODO: Fix variable case!
 		_ => false,
  	}
 }
@@ -243,7 +266,7 @@ fn as_bool(obj: Object) -> Result<bool, EvalError> {
 	use self::Object::*;
 	match obj {
 		Bool(b) => Ok(b),
-		_ => Err(EvalError::new(&format!("Expected Boolean, got {:?}", obj)))
+		_ => Err(EvalError::new("Operands must be Booleans"))
 	}
 }
 
@@ -251,7 +274,7 @@ fn as_num(obj: Object) -> Result<f64, EvalError> {
 	use self::Object::*;
 	match obj {
 		Num(n) => Ok(n),
-		_ => Err(EvalError::new(&format!("Expected number, got {:?}", obj)))
+		_ => Err(EvalError::new("Operands must be numbers."))
 	}
 }
 
@@ -259,6 +282,6 @@ fn as_str(obj: Object) -> Result<String, EvalError> {
 	use self::Object::*;
 	match obj {
 		Str(s) => Ok(s.to_owned()),
-		_ => Err(EvalError::new(&format!("Expected String, got {:?}", obj)))
+		_ => Err(EvalError::new("Operands must be strings."))
 	}
 }

@@ -1,9 +1,10 @@
-use crate::cerror::{perror, ParseError};
+use crate::cerror::{LoxError, perror, ParseError};
 use crate::expr::Expr;
 use crate::object::Object;
 use crate::stmt::Stmt;
 use crate::token::{Token, TokenType};
 
+use std::error::Error;
 use std::iter::Peekable;
 use std::rc::Rc;
 use std::vec::IntoIter;
@@ -19,7 +20,7 @@ impl Parser {
 		Parser { tokens: tokens.into_iter().peekable(), prev }
 	}
 
-	pub fn parse(&mut self) -> Result<Vec<Rc<Stmt>>, String> {//Result<Rc<Expr>, String> {
+	pub fn parse(&mut self) -> Result<Vec<Rc<Stmt>>, LoxError> {//Result<Rc<Expr>, String> {
 		let mut stmts = Vec::new();
 		let mut failed = false;
 		while self.tokens.peek().unwrap().ttype != TokenType::Eof {
@@ -34,7 +35,7 @@ impl Parser {
 			}
 		}
 		if failed {
-			Err("Parsing failed!".to_string())
+			Err(LoxError::Parse)
 		} else {
 			Ok(stmts)
 		}
@@ -49,6 +50,8 @@ impl Parser {
 			self.block()
 		} else if self.match_advance(&[TokenType::If]) {
 			self.if_statement()
+		} else if self.match_advance(&[TokenType::While]) {
+			self.while_statement()
 		} else if self.identifier_match() {
 			self.assign_statement()
 		} else {
@@ -81,12 +84,14 @@ impl Parser {
 	fn var_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
 		if self.check_identifier() {
 			let variable = self.expression()?;
-			self.consume(TokenType::Equal, "Expect '=' for variable declaration.");
-			let value = self.expression()?;
+			let mut value = Expr::literal(Object::Nil);
+			if self.match_advance(&[TokenType::Equal]) {
+				value = self.expression()?;
+			}
 			self.advance_end_of_statement();
 			Ok(Stmt::declare(variable, value))
 		} else {
-			Err(perror(self.tokens.peek().unwrap().clone(), "Expect identifier after var."))
+			Err(perror(self.tokens.peek().unwrap().clone(), "Expect variable name."))
 		}
 
 	}
@@ -114,6 +119,14 @@ impl Parser {
 		}
 		// self.advance_end_of_statement();
 		Ok(Stmt::ifstmt(Rc::new(conditionals), Rc::new(else_block)))
+	}
+
+	fn while_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
+		let condition = self.expression()?;
+		self.consume(TokenType::LeftBrace, "Expect blocks for conditional statements.");
+		let blk = self.block()?;
+		// self.advance_end_of_statement();
+		Ok(Stmt::whilestmt(condition, blk))
 	}
 
 	fn assign_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
@@ -288,7 +301,7 @@ impl Parser {
 	fn primary(&mut self) -> Result<Rc<Expr>, ParseError> {
 		use crate::token::TokenType::*;
 		if self.check(TokenType::Semicolon) {
-			return Err(perror(self.peek()?.clone(), "Expect primary!"))
+			return Err(perror(self.peek()?.clone(), "Expect expression."))
 		}
 		match &self.advance()?.ttype {
 			False => Ok(Expr::literal(Object::Bool(false))),

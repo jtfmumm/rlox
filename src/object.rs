@@ -14,7 +14,7 @@ impl fmt::Display for Object {
         use Object::*;
         match self {
         	Nil => write!(f, "nil"),
-        	Str(s) => write!(f, "\"{}\"", s),
+        	Str(s) => write!(f, "{}", s),
         	Num(n) => write!(f, "{}", n),
         	Bool(b) => write!(f, "{}", b),
         	// Variable { name } => write!(f, "Var({})", name),

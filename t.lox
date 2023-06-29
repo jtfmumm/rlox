@@ -29,3 +29,11 @@ if b > 2 {
 if b > 2 {
 	print "0";
 }
+
+print "While Loop!";
+
+var x = 0;
+while x < 10 {
+	print x;
+	x = x + 1;
+}

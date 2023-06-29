@@ -18,7 +18,8 @@ pub enum Stmt {
 	IfStmt { conditionals: Rc<Vec<(Rc<Expr>, Rc<Stmt>)>>,
 			 else_block: Rc<Option<Rc<Stmt>>>
 		   },
-	BlockStmt { stmts: Rc<Vec<Rc<Stmt>>> }
+	BlockStmt { stmts: Rc<Vec<Rc<Stmt>>> },
+	WhileStmt { condition: Rc<Expr>, block: Rc<Stmt> },
 }
 
 impl Stmt {
@@ -53,6 +54,10 @@ impl Stmt {
 
 	pub fn block(stmts: Rc<Vec<Rc<Stmt>>>) -> Rc<Stmt> {
 		Rc::new(Stmt::BlockStmt { stmts })
+	}
+
+	pub fn whilestmt(condition: Rc<Expr>, block: Rc<Stmt>) -> Rc<Stmt> {
+		Rc::new(Stmt::WhileStmt { condition, block })
 	}
 }
 
@@ -96,13 +101,19 @@ impl fmt::Display for Stmt {
 					s += &block.to_string();
 				}
 				s
-			}
+			},
 			BlockStmt { ref stmts } => {
 				let mut s = "".to_string();
 				for stmt in stmts.iter() {
 					s += &stmt.to_string();
 					s += ";\n";
 				}
+				s
+			},
+			WhileStmt { ref condition, ref block } => {
+				let mut s = "while ".to_string();
+				s += &condition.to_string();
+				s += &block.to_string();
 				s
 			}
 		};

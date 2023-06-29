@@ -44,7 +44,7 @@ impl Environment {
 				Some(ref outer_env) => {
 					outer_env.borrow().lookup(&name)
 				},
-				None => Err(EvalError::new(&format!("Variable {} has not been declared!", name.clone())))
+				None => Err(EvalError::new(&format!("Undefined variable '{}'.", name.clone())))
 			}
 		}
 	}
@@ -60,7 +60,7 @@ impl Environment {
 					self.outer = Some(outer_env);
 					res
 				},
-				None => Err(EvalError::new(&format!("Variable {} has not been declared!", name.clone())))
+				None => Err(EvalError::new(&format!("Undefined variable '{}'.", name.clone())))
 			}
 		}
 	}

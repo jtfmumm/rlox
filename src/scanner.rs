@@ -1,6 +1,7 @@
-use crate::cerror::scerror;
+use crate::cerror::{LoxError, scerror, ScannerError};
 use crate::token::{Token, TokenType};
 
+use std::error::Error;
 use std::mem;
 
 const KEYWORDS: [&'static str; 18] = ["and", "class", "elif", "else", "false", "fun", "for",
@@ -26,7 +27,7 @@ impl Scanner {
 		Scanner { source_string: s, source, tokens: Vec::new(), start, current, line, hit_error: false }
 	}
 
-	pub fn scan_tokens(&mut self) -> Result<Vec<Token>,()> {
+	pub fn scan_tokens(&mut self) -> Result<Vec<Token>,LoxError> {
 		while !self.is_at_end() {
 			self.start = self.current;
 			self.scan_token()
@@ -36,7 +37,7 @@ impl Scanner {
 		if !self.hit_error {
 			Ok(mem::replace(&mut self.tokens, Vec::new()))
 		} else {
-			Err(())
+			Err(LoxError::Scan)
 		}
 	}
 
@@ -100,7 +101,7 @@ impl Scanner {
 			},
 			'/' => {
 				if self.match_advance('/') {
-					while !(self.peek() == '\n' || self.is_at_end())  { self.current += 1; }; return
+					while !(self.is_at_end() || self.peek() == '\n')  { self.current += 1; }; return
 				} else if self.match_advance('*') {
 					while !self.is_at_end() && !(self.peek() == '*' && self.peek_next() == '/') {
 						self.current += 1;

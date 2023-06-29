@@ -4,7 +4,9 @@ These tests were all written by Robert Nystrom.
 
 ## Testing
 
-## Testing
+This works with Dart 2.12 but not the latest. `brew install dart@2.12`
+
+Run `dart pub get` in ./tool to get deps.
 
 I've copied in Nystrom's Lox interpreter test suite. From his testing docs:
 
