@@ -1,7 +1,6 @@
-use crate::cerror::{LoxError, scerror, ScannerError};
+use crate::cerror::{LoxError, scerror};
 use crate::token::{Token, TokenType};
 
-use std::error::Error;
 use std::mem;
 
 const KEYWORDS: [&'static str; 18] = ["and", "class", "elif", "else", "false", "fun", "for",

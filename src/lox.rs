@@ -3,8 +3,6 @@ use crate::interpreter::Interpreter;
 use crate::parser::Parser;
 use crate::scanner::Scanner;
 
-use std::env;
-use std::error::Error;
 use std::fs;
 use std::io;
 use std::io::Write;
@@ -36,7 +34,6 @@ impl Lox {
 					LoxError::Parse => process::exit(COMPILE_ERROR_CODE),
 					LoxError::Runtime => process::exit(RUNTIME_ERROR_CODE),
 					LoxError::Scan => process::exit(COMPILE_ERROR_CODE),
-					_ => process::exit(RUNTIME_ERROR_CODE)
 				}
 			}
 		}

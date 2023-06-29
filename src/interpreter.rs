@@ -6,8 +6,6 @@ use crate::stmt::Stmt;
 use crate::token::{Token, TokenType};
 
 use std::cell::RefCell;
-use std::error::Error;
-use std::mem;
 use std::rc::Rc;
 
 pub struct Interpreter {
@@ -85,7 +83,7 @@ impl Interpreter {
 						self.env = self.env.clone().borrow().remove_scope()?;
 						Ok(Object::Nil)
 					},
-					Err(err) => Err(EvalError::new("Failed while evaluating block."))
+					Err(_) => Err(EvalError::new("Failed while evaluating block."))
 				}
 			},
 			WhileStmt { condition, block } => {
@@ -94,6 +92,13 @@ impl Interpreter {
 				}
 				Ok(Object::Nil)
 			},
+			// ForStmt { init, condition, inc, block } => {
+
+			// 	// while is_truthy(&self.evaluate(condition)?) {
+			// 	// 	self.execute(block.clone())?;
+			// 	// }
+			// 	// Ok(Object::Nil)
+			// },
 			IfStmt { conditionals, else_block } => {
 				for (c, blk) in conditionals.iter() {
 					if is_truthy(&self.evaluate(c)?) {
@@ -262,13 +267,13 @@ fn is_equal(l: Object, r: Object) -> bool {
  	}
 }
 
-fn as_bool(obj: Object) -> Result<bool, EvalError> {
-	use self::Object::*;
-	match obj {
-		Bool(b) => Ok(b),
-		_ => Err(EvalError::new("Operands must be Booleans"))
-	}
-}
+// fn as_bool(obj: Object) -> Result<bool, EvalError> {
+// 	use self::Object::*;
+// 	match obj {
+// 		Bool(b) => Ok(b),
+// 		_ => Err(EvalError::new("Operands must be Booleans"))
+// 	}
+// }
 
 fn as_num(obj: Object) -> Result<f64, EvalError> {
 	use self::Object::*;

@@ -13,6 +13,6 @@ fn main() {
 	        .expect("python command failed to start");
 
 	p!("\n");
-	p!("Python script generated Expr module");
+	p!("Python script generated Expr and Stmt enums");
 	p!("\n\n")
 }

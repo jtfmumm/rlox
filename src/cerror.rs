@@ -27,7 +27,7 @@ pub fn preport(line_n: u32, location: &str, msg: &str) {
 	// eprintln!("\x1b[1;31m[{}] Error\x1b[0m{}: {}", line_n, location, msg);
 }
 
-pub fn report(line_n: u32, location: &str, msg: &str) {
+pub fn report(_line_n: u32, _location: &str, msg: &str) {
 	eprintln!("{}\n", msg);
 	// eprintln!("{}\n\x1b[1;31m[line {:}] Error\x1b[0m {}", msg, line_n, location);
 }

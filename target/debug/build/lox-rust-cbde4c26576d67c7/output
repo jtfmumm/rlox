@@ -1,6 +1,6 @@
 cargo:warning=***** 
  *****
-cargo:warning=***** Python script generated Expr module *****
+cargo:warning=***** Python script generated Expr and Stmt enums *****
 cargo:warning=***** 
 
  *****

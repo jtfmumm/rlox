@@ -1,5 +1,4 @@
 use crate::cerror::EvalError;
-use crate::expr::Expr;
 use crate::object::Object;
 
 use std::cell::RefCell;

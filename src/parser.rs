@@ -4,7 +4,6 @@ use crate::object::Object;
 use crate::stmt::Stmt;
 use crate::token::{Token, TokenType};
 
-use std::error::Error;
 use std::iter::Peekable;
 use std::rc::Rc;
 use std::vec::IntoIter;
@@ -30,7 +29,7 @@ impl Parser {
 				},
 				Err(_) => {
 					failed = true;
-					self.synchronize();
+					let _ = self.synchronize();
 				}
 			}
 		}
@@ -70,14 +69,14 @@ impl Parser {
 				},
 				Err(_) => {
 					failed = true;
-					self.synchronize();
+					let _ = self.synchronize();
 				}
 			}
 		}
 		if failed {
 			Err(perror(self.peek_prev().clone(), "Error while parsing block."))
 		} else {
-			Ok(Stmt::block(Rc::new(stmts)))
+			Ok(Stmt::block_stmt(Rc::new(stmts)))
 		}
 	}
 
@@ -88,8 +87,8 @@ impl Parser {
 			if self.match_advance(&[TokenType::Equal]) {
 				value = self.expression()?;
 			}
-			self.advance_end_of_statement();
-			Ok(Stmt::declare(variable, value))
+			self.advance_end_of_statement()?;
+			Ok(Stmt::var_decl_stmt(variable, value))
 		} else {
 			Err(perror(self.tokens.peek().unwrap().clone(), "Expect variable name."))
 		}
@@ -98,8 +97,8 @@ impl Parser {
 
 	fn print_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
 		let expr = self.expression()?;
-		self.advance_end_of_statement();
-		Ok(Stmt::print(expr))
+		self.advance_end_of_statement()?;
+		Ok(Stmt::print_stmt(expr))
 	}
 
 	fn if_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
@@ -107,26 +106,26 @@ impl Parser {
 		let mut else_block = None;
 		loop {
 			let conditional = self.expression()?;
-			self.consume(TokenType::LeftBrace, "Expect blocks for conditional statements.");
+			self.consume(TokenType::LeftBrace, "Expect blocks for conditional statements.")?;
 			let blk = self.block()?;
 			conditionals.push((conditional, blk));
 			if !self.match_advance(&[TokenType::Elif]) { break }
 		}
 		if self.match_advance(&[TokenType::Else]) {
-			self.consume(TokenType::LeftBrace, "Expect blocks for else statements.");
+			self.consume(TokenType::LeftBrace, "Expect blocks for else statements.")?;
 			let blk = self.block()?;
 			else_block = Some(blk);
 		}
-		// self.advance_end_of_statement();
-		Ok(Stmt::ifstmt(Rc::new(conditionals), Rc::new(else_block)))
+		// self.advance_end_of_statement()?;
+		Ok(Stmt::if_stmt(Rc::new(conditionals), Rc::new(else_block)))
 	}
 
 	fn while_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
 		let condition = self.expression()?;
-		self.consume(TokenType::LeftBrace, "Expect blocks for conditional statements.");
+		self.consume(TokenType::LeftBrace, "Expect blocks for conditional statements.")?;
 		let blk = self.block()?;
-		// self.advance_end_of_statement();
-		Ok(Stmt::whilestmt(condition, blk))
+		// self.advance_end_of_statement()?;
+		Ok(Stmt::while_stmt(condition, blk))
 	}
 
 	fn assign_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
@@ -134,19 +133,19 @@ impl Parser {
 
 		if self.match_advance(&[TokenType::Equal]) {
 			let value = self.expression()?;
-			self.advance_end_of_statement();
-			return Ok(Stmt::assign(expr, value))
+			self.advance_end_of_statement()?;
+			return Ok(Stmt::assign_stmt(expr, value))
 		}
 
 		// Not an assignment
-		self.advance_end_of_statement();
-		Ok(Stmt::expr(expr))
+		self.advance_end_of_statement()?;
+		Ok(Stmt::expr_stmt(expr))
 	}
 
 	fn expr_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
 		let expr = self.expression()?;
-		self.advance_end_of_statement();
-		Ok(Stmt::expr(expr))
+		self.advance_end_of_statement()?;
+		Ok(Stmt::expr_stmt(expr))
 	}
 
 	fn peek(&mut self) -> Result<&Token, ParseError> {
@@ -325,7 +324,7 @@ impl Parser {
 				self.consume(TokenType::RightBrace, "Expect }!")?;
 				Ok(Expr::block(expr))
 			},
-			Identifier(name) => Ok(Expr::variable(&name)),
+			Identifier(name) => Ok(Expr::variable(name.clone())),
 			_ => {
 				Err(perror(self.peek_prev().clone(), "Supposed primary not found!"))
 			}
