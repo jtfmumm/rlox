@@ -127,17 +127,11 @@ impl Interpreter {
 					Err(everr) => Err(everr.with_context(operator.clone(), &expr.to_string())),
 				}
 			},
-			Logic { ref left, ref operator, ref right } => {
-				match self.eval_logic(left, operator, right) {
-					Ok(exp) => Ok(exp),
-					Err(everr) => Err(everr.with_context(operator.clone(), &expr.to_string())),
-				}
+			Block { ref expression } => {
+				self.eval_block(expression)
 			},
 			Grouping { ref expression } => {
 				self.eval_grouping(expression)
-			},
-			Block { ref expression } => {
-				self.eval_block(expression)
 			},
 			Literal { ref value } => {
 				use self::Object::*;
@@ -150,14 +144,20 @@ impl Interpreter {
 					// Variable { name } => Variable { name: name.clone() },
 				})
 			},
-			Variable { ref name } => {
-				Ok(self.env.borrow_mut().lookup(name)?)
+			Logic { ref left, ref operator, ref right } => {
+				match self.eval_logic(left, operator, right) {
+					Ok(exp) => Ok(exp),
+					Err(everr) => Err(everr.with_context(operator.clone(), &expr.to_string())),
+				}
 			},
 			Unary { ref operator, ref right } => {
 				match self.eval_unary(operator, right) {
 					Ok(exp) => Ok(exp),
 					Err(everr) => Err(everr.with_context(operator.clone(), &expr.to_string())),
 				}
+			},
+			Variable { ref name } => {
+				Ok(self.env.borrow_mut().lookup(name)?)
 			},
 		}
 	}
@@ -181,8 +181,8 @@ impl Interpreter {
 		use TokenType::*;
 		use self::Object::*;
 		match &op.ttype {
-			Minus => Ok(Num(-as_num(r)?)),
 			Bang => Ok(Bool(!(is_truthy(&r)))),
+			Minus => Ok(Num(-as_num(r)?)),
 			tt => Err(EvalError::new(&format!("eval_unary: Invalid operator! {:?}", tt)))
 		}
 	}
@@ -194,17 +194,16 @@ impl Interpreter {
 		use TokenType::*;
 		use self::Object::*;
 		match &operator.ttype {
-			Minus => Ok(Num(as_num(l)? - as_num(r)?)),
-			// TODO: Handle concat for Strings! "3" + "rd"
-			Plus => Ok(eval_plus(l, r)?),
-			Slash => Ok(eval_div(l, r)?),
-			Star => Ok(Num(as_num(l)? * as_num(r)?)),
-			EqualEqual => Ok(Bool(is_equal(l, r))),
 			BangEqual => Ok(Bool(!is_equal(l, r))),
+			EqualEqual => Ok(Bool(is_equal(l, r))),
 			Greater => Ok(Bool(as_num(l)? > as_num(r)?)),
 			GreaterEqual => Ok(Bool(as_num(l)? >= as_num(r)?)),
 			Less => Ok(Bool(as_num(l)? < as_num(r)?)),
 			LessEqual => Ok(Bool(as_num(l)? <= as_num(r)?)),
+			Minus => Ok(Num(as_num(l)? - as_num(r)?)),
+			Plus => Ok(eval_plus(l, r)?),
+			Slash => Ok(eval_div(l, r)?),
+			Star => Ok(Num(as_num(l)? * as_num(r)?)),
 			tt => Err(EvalError::new(&format!("eval_binary: Invalid operator! {:?}", tt)))
 		}
 	}
@@ -262,10 +261,10 @@ fn is_truthy(obj: &Object) -> bool {
 fn is_equal(l: Object, r: Object) -> bool {
 	use self::Object::*;
 	match (l, r) {
-		(Nil, Nil) => true,
+		(Bool(b1), Bool(b2)) => b1 == b2,
 		(Num(n1), Num(n2)) => n1 == n2,
 		(Str(s1), Str(s2)) => s1 == s2,
-		(Bool(b1), Bool(b2)) => b1 == b2,
+		(Nil, Nil) => true,
 		_ => false,
  	}
 }
