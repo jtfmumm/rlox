@@ -92,7 +92,7 @@ impl Interpreter {
 				match &*variable.clone() {
 					Expr::Variable { name } => {
 						let val = self.evaluate(&value)?;
-						self.env.borrow_mut().declare(name, val)?;
+						self.env.borrow_mut().declare(name.clone(), val)?;
 						Ok(Object::Nil)
 					},
 					_ => Err(EvalError::new("Expect declaration to declare variable."))
@@ -115,7 +115,7 @@ impl Interpreter {
 				match &*variable.clone() {
 					Expr::Variable { name } => {
 						let val = self.evaluate(&value)?;
-						self.env.borrow_mut().assign(name, val.clone())?;
+						self.env.borrow_mut().assign(name.clone(), val.clone())?;
 						Ok(val)
 					},
 					_ => Err(EvalError::new("Invalid assignment target."))
@@ -157,7 +157,7 @@ impl Interpreter {
 				}
 			},
 			Variable { ref name } => {
-				Ok(self.env.borrow_mut().lookup(name)?)
+				Ok(self.env.borrow_mut().lookup(name.clone())?)
 			},
 		}
 	}

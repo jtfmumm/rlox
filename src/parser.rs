@@ -99,11 +99,17 @@ impl Parser {
 		let init = if self.match_advance(&[TokenType::Semicolon]) {
 			None
 		} else {
+			if !(self.check_var() || self.check_identifier()) {
+				return Err(perror(self.peek()?.clone(), "Expect expression."))
+			}
 			Some(self.declaration()?)
 		};
 		let condition = if self.match_advance(&[TokenType::Semicolon]) {
 			None
 		} else {
+			if !self.check_identifier() {
+				return Err(perror(self.peek()?.clone(), "Expect expression."))
+			}
 			let exp = Some(self.expression()?);
 			self.consume(TokenType::Semicolon, "Expect ; after for condition.")?;
 			exp
@@ -111,6 +117,9 @@ impl Parser {
 		let inc = if self.match_advance(&[TokenType::RightParen]) {
 			None
 		} else {
+			if !self.check_identifier() {
+				return Err(perror(self.peek()?.clone(), "Expect expression."))
+			}
 			let expr = Some(self.expression()?);
 			self.consume(TokenType::RightParen, "Expect ) for end of for.")?;
 			expr
@@ -128,7 +137,7 @@ impl Parser {
 					(variable.clone(), value.clone())
 				},
 				Expr::Variable { name } => {
-					(Expr::variable(name.to_string()), Expr::literal(Object::Nil))
+					(Expr::variable(name.clone()), Expr::literal(Object::Nil))
 				}
 				_ => return Err(perror(self.peek_prev().clone(), "Invalid declaration"))
 			};
@@ -237,6 +246,10 @@ impl Parser {
 		self.tokens.peek().map(|t| {
 			matches.iter().any(|mtt| *mtt == t.ttype)
 		}).unwrap_or(false)
+	}
+
+	fn check_var(&mut self) -> bool {
+		self.check(&[TokenType::Var])
 	}
 
 	fn check_identifier(&mut self) -> bool {
@@ -364,7 +377,8 @@ impl Parser {
 		if self.check(&[TokenType::Semicolon]) {
 			return Err(perror(self.peek()?.clone(), "Expect expression."))
 		}
-		match &self.advance()?.ttype {
+		let token = &self.advance()?;
+		match &token.ttype {
 			False => Ok(Expr::literal(Object::Bool(false))),
 			True => Ok(Expr::literal(Object::Bool(true))),
 			Nil => Ok(Expr::literal(Object::Nil)),
@@ -386,7 +400,7 @@ impl Parser {
 				self.consume(TokenType::RightBrace, "Expect }!")?;
 				Ok(Expr::block(expr))
 			},
-			Identifier(name) => Ok(Expr::variable(name.clone())),
+			Identifier(_) => Ok(Expr::variable(token.clone().clone())),
 			_ => {
 				Err(perror(self.peek_prev().clone(), "Expect expression."))
 			}

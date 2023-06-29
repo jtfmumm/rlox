@@ -128,14 +128,16 @@ impl Scanner {
 	fn scan_string(&mut self) -> TokenType {
 		while !self.match_advance('"') {
 			if self.is_at_end() { self.report_error("Unterminated string."); return TokenType::Error }
+			if self.peek() == '\n' { self.line += 1;  }
 			self.current += 1
 		}
+
 		TokenType::StringLit(self.source_string[self.start + 1..self.current - 1].to_string())
 	}
 
 	fn scan_word(&mut self) -> TokenType {
 		while !self.is_at_end() && (self.peek().is_alphanumeric() || self.peek() == '_') {
-			self.current += 1
+			self.current += 1;
 		}
 		let substr = self.source_substr();
 		if KEYWORDS.contains(&&substr[..]) {

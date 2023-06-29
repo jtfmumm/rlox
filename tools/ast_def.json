@@ -7,7 +7,7 @@
 	"Literal  : Object value",
 	"Logic    : Rc<Expr> left, Token operator, Rc<Expr> right",
 	"Unary    : Token operator, Rc<Expr> right",
-	"Variable : String name"
+	"Variable : Token name"
 ],
 "Stmt": [
 	"BlockStmt   : Rc<Vec<Rc<Stmt>>> stmts",
