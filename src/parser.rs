@@ -53,8 +53,6 @@ impl Parser {
 			self.while_statement()
 		} else if self.match_advance(&[TokenType::For]) {
 			self.for_statement()
-		} else if self.identifier_match() {
-			self.assign_statement()
 		} else {
 			self.expr_statement()
 		}
@@ -64,17 +62,22 @@ impl Parser {
 		let mut stmts = Vec::new();
 		let mut failed = false;
 
-		while !self.match_advance(&[TokenType::RightBrace]) {
-			match self.statement() {
-				Ok(stmt) => {
-					stmts.push(stmt);
-				},
-				Err(_) => {
-					failed = true;
-					let _ = self.synchronize();
+		if self.match_advance(&[TokenType::LeftBrace]) {
+			while !self.match_advance(&[TokenType::RightBrace]) {
+				match self.statement() {
+					Ok(stmt) => {
+						stmts.push(stmt);
+					},
+					Err(_) => {
+						failed = true;
+						let _ = self.synchronize();
+					}
 				}
 			}
+		} else {
+			stmts.push(self.statement()?)
 		}
+
 		if failed {
 			Err(perror(self.peek_prev().clone(), "Error while parsing block."))
 		} else {
@@ -84,26 +87,47 @@ impl Parser {
 
 	fn for_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
 		self.consume(TokenType::LeftParen, "Expect ( for condition.")?;
-		let init = self.statement()?;
-		let condition = self.expression()?;
-		self.consume(TokenType::Semicolon, "Expect ; after for condition.")?;
-		let inc = self.statement()?;
-		self.consume(TokenType::RightParen, "Expect ) for condition.")?;
-		self.consume(TokenType::LeftBrace, "Expect blocks for conditional statements.")?;
+		let init = if self.match_advance(&[TokenType::Semicolon]) {
+			None
+		} else {
+			Some(self.statement()?)
+		};
+		let condition = if self.match_advance(&[TokenType::Semicolon]) {
+			None
+		} else {
+			let exp = Some(self.expression()?);
+			self.consume(TokenType::Semicolon, "Expect ; after for condition.")?;
+			exp
+		};
+		let inc = if self.match_advance(&[TokenType::RightParen]) {
+			None
+		} else {
+			let expr = Some(self.expression()?);
+			self.consume(TokenType::RightParen, "Expect ) for condition.")?;
+			expr
+		};
+		// self.consume(TokenType::LeftBrace, "Expect blocks for conditional statements.")?;
 		let blk = self.block()?;
 		// self.advance_end_of_statement()?;
-		Ok(Stmt::for_stmt(init, condition, inc, blk))
+		Ok(Stmt::for_stmt(Rc::new(init), Rc::new(condition), Rc::new(inc), blk))
 	}
 
 	fn var_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
 		if self.check_identifier() {
-			let variable = self.expression()?;
-			let mut value = Expr::literal(Object::Nil);
-			if self.match_advance(&[TokenType::Equal]) {
-				value = self.expression()?;
-			}
+			let (vr, vl) = match &*self.expression()?.clone() {
+				Expr::Assign { variable, value } => {
+					(variable.clone(), value.clone())
+				},
+				Expr::Variable { name } => {
+					(Expr::variable(name.to_string()), Expr::literal(Object::Nil))
+				}
+				_ => return Err(perror(self.peek_prev().clone(), "Invalid declaration"))
+			};
+			// if self.match_advance(&[TokenType::Equal]) {
+			// 	value = self.expression()?;
+			// }
 			self.advance_end_of_statement()?;
-			Ok(Stmt::var_decl_stmt(variable, value))
+			Ok(Stmt::var_decl_stmt(vr, vl))
 		} else {
 			Err(perror(self.tokens.peek().unwrap().clone(), "Expect variable name."))
 		}
@@ -123,13 +147,13 @@ impl Parser {
 			self.consume(TokenType::LeftParen, "Expect ( for condition.")?;
 			let conditional = self.expression()?;
 			self.consume(TokenType::RightParen, "Expect ) for condition.")?;
-			self.consume(TokenType::LeftBrace, "Expect blocks for conditional statements.")?;
+			// self.consume(TokenType::LeftBrace, "Expect blocks for conditional statements.")?;
 			let blk = self.block()?;
 			conditionals.push((conditional, blk));
 			if !self.match_advance(&[TokenType::Elif]) { break }
 		}
 		if self.match_advance(&[TokenType::Else]) {
-			self.consume(TokenType::LeftBrace, "Expect blocks for else statements.")?;
+			// self.consume(TokenType::LeftBrace, "Expect blocks for else statements.")?;
 			let blk = self.block()?;
 			else_block = Some(blk);
 		}
@@ -141,25 +165,27 @@ impl Parser {
 		self.consume(TokenType::LeftParen, "Expect ( for condition.")?;
 		let condition = self.expression()?;
 		self.consume(TokenType::RightParen, "Expect ) for condition.")?;
-		self.consume(TokenType::LeftBrace, "Expect blocks for conditional statements.")?;
+		// self.consume(TokenType::LeftBrace, "Expect blocks for conditional statements.")?;
 		let blk = self.block()?;
 		// self.advance_end_of_statement()?;
 		Ok(Stmt::while_stmt(condition, blk))
 	}
 
-	fn assign_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
-		let expr = self.expression()?;
+	// fn assign_statement(&mut self, expect_semicolon: bool) -> Result<Rc<Stmt>, ParseError> {
+	// 	let expr = self.expression()?;
 
-		if self.match_advance(&[TokenType::Equal]) {
-			let value = self.expression()?;
-			self.advance_end_of_statement()?;
-			return Ok(Stmt::assign_stmt(expr, value))
-		}
+	// 	if self.match_advance(&[TokenType::Equal]) {
+	// 		let value = self.expression()?;
+	// 		if expect_semicolon {
+	// 			self.advance_end_of_statement()?;
+	// 		}
+	// 		return Ok(Stmt::assign_stmt(expr, value))
+	// 	}
 
-		// Not an assignment
-		self.advance_end_of_statement()?;
-		Ok(Stmt::expr_stmt(expr))
-	}
+	// 	// Not an assignment
+	// 	self.advance_end_of_statement()?;
+	// 	Ok(Stmt::expr_stmt(expr))
+	// }
 
 	fn expr_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
 		let expr = self.expression()?;
@@ -196,13 +222,13 @@ impl Parser {
 		is_match
 	}
 
-	fn identifier_match(&mut self) -> bool {
-		self.tokens.peek().map(|t| {
-			match t.ttype {
-				TokenType::Identifier(_) => true,
-				_ => false
-			}}).unwrap_or(false)
-	}
+	// fn identifier_match(&mut self) -> bool {
+	// 	self.tokens.peek().map(|t| {
+	// 		match t.ttype {
+	// 			TokenType::Identifier(_) => true,
+	// 			_ => false
+	// 		}}).unwrap_or(false)
+	// }
 
 	fn check(&mut self, mtt: TokenType) -> bool {
 		self.tokens.peek().map(|t| {
@@ -251,12 +277,26 @@ impl Parser {
 	}
 
 	fn logic_and(&mut self) -> Result<Rc<Expr>, ParseError> {
-		let mut expr = self.equality()?;
+		let mut expr = self.assignment()?;
 
 		while self.match_advance(&[TokenType::And]) {
 			let op = self.peek_prev().clone();
-			let right = self.equality()?;
+			let right = self.assignment()?;
 			expr = Expr::logic(expr, op, right);
+		}
+		Ok(expr)
+	}
+
+	fn assignment(&mut self) -> Result<Rc<Expr>, ParseError> {
+		let expr = self.equality()?;
+
+		if self.match_advance(&[TokenType::Equal]) {
+			match &*expr.clone() {
+				Expr::Variable { .. } => {},
+				_ => return Err(perror(self.peek_prev().clone(), "Invalid assignment target."))
+			}
+			let value = self.equality()?;
+			return Ok(Expr::assign(expr, value))
 		}
 		Ok(expr)
 	}

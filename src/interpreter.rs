@@ -48,16 +48,6 @@ impl Interpreter {
 	fn execute(&mut self, stmt: Rc<Stmt>) -> Result<Object, EvalError> {
 		use Stmt::*;
 		match &*stmt {
-			AssignStmt { variable, value } => {
-				match &*variable.clone() {
-					Expr::Variable { name } => {
-						let val = self.evaluate(&value)?;
-						self.env.borrow_mut().assign(name, val)?;
-						Ok(Object::Nil)
-					},
-					_ => Err(EvalError::new("Invalid assignment target."))
-				}
-			},
 			BlockStmt { stmts } => {
 				self.env = Environment::add_scope(self.env.clone());
 				match self.interpret(stmts.to_vec()) {
@@ -73,10 +63,15 @@ impl Interpreter {
 			},
 			ForStmt { init, condition, inc, block } => {
 				self.env = Environment::add_scope(self.env.clone());
-				self.execute(init.clone())?;
-				while is_truthy(&self.evaluate(condition)?) {
+				if let Some(stmt) = &*init.clone() { self.execute(stmt.clone())?; }
+				let cond = if let Some(ref exp) = &*condition.clone() {
+					exp.clone()
+				} else {
+					Expr::literal(Object::Bool(true))
+				};
+				while is_truthy(&self.evaluate(&cond)?) {
 					self.execute(block.clone())?;
-					self.execute(inc.clone())?;
+					if let Some(expr) = &*inc.clone() { self.evaluate(&*expr.clone())?; }
 				}
 				self.env = self.env.clone().borrow().remove_scope()?;
 				Ok(Object::Nil)
@@ -121,6 +116,16 @@ impl Interpreter {
 		use Expr::*;
 
 		match expr {
+			Assign { variable, value } => {
+				match &*variable.clone() {
+					Expr::Variable { name } => {
+						let val = self.evaluate(&value)?;
+						self.env.borrow_mut().assign(name, val.clone())?;
+						Ok(val)
+					},
+					_ => Err(EvalError::new("Invalid assignment target."))
+				}
+			},
 			Binary { ref left, ref operator, ref right } => {
 				match self.eval_binary(left, operator, right) {
 					Ok(exp) => Ok(exp),

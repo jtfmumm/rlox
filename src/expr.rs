@@ -11,6 +11,7 @@ use std::rc::Rc;
 	
 #[derive(Debug)]
 pub enum Expr {
+	Assign { variable: Rc<Expr>, value: Rc<Expr> },
 	Binary { left: Rc<Expr>, operator: Token, right: Rc<Expr> },
 	Block { expression: Rc<Expr> },
 	Grouping { expression: Rc<Expr> },
@@ -21,6 +22,10 @@ pub enum Expr {
 }
 
 impl Expr {
+	pub fn assign(variable: Rc<Expr>, value: Rc<Expr>) -> Rc<Expr> {
+		Rc::new(Expr::Assign { variable, value })
+	}
+
 	pub fn binary(left: Rc<Expr>, operator: Token, right: Rc<Expr>) -> Rc<Expr> {
 		Rc::new(Expr::Binary { left, operator, right })
 	}

@@ -1,5 +1,6 @@
 {
 "Expr": [
+	"Assign   : Rc<Expr> variable, Rc<Expr> value",
 	"Binary   : Rc<Expr> left, Token operator, Rc<Expr> right",
 	"Block    : Rc<Expr> expression",
 	"Grouping : Rc<Expr> expression",
@@ -9,10 +10,9 @@
 	"Variable : String name"
 ],
 "Stmt": [
-	"AssignStmt  : Rc<Expr> variable, Rc<Expr> value",
 	"BlockStmt   : Rc<Vec<Rc<Stmt>>> stmts",
 	"ExprStmt    : Rc<Expr> expr",
-	"ForStmt     : Rc<Stmt> init, Rc<Expr> condition, Rc<Stmt> inc, Rc<Stmt> block",
+	"ForStmt     : Rc<Option<Rc<Stmt>>> init, Rc<Option<Rc<Expr>>> condition, Rc<Option<Rc<Expr>>> inc, Rc<Stmt> block",
 	"IfStmt      : Rc<Vec<(Rc<Expr>-Rc<Stmt>)>> conditionals, Rc<Option<Rc<Stmt>>> else_block",
 	"PrintStmt   : Rc<Expr> expr",
 	"VarDeclStmt : Rc<Expr> variable, Rc<Expr> value",
