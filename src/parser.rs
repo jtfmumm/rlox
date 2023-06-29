@@ -51,6 +51,8 @@ impl Parser {
 			self.if_statement()
 		} else if self.match_advance(&[TokenType::While]) {
 			self.while_statement()
+		} else if self.match_advance(&[TokenType::For]) {
+			self.for_statement()
 		} else if self.identifier_match() {
 			self.assign_statement()
 		} else {
@@ -80,6 +82,19 @@ impl Parser {
 		}
 	}
 
+	fn for_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
+		self.consume(TokenType::LeftParen, "Expect ( for condition.")?;
+		let init = self.statement()?;
+		let condition = self.expression()?;
+		self.consume(TokenType::Semicolon, "Expect ; after for condition.")?;
+		let inc = self.statement()?;
+		self.consume(TokenType::RightParen, "Expect ) for condition.")?;
+		self.consume(TokenType::LeftBrace, "Expect blocks for conditional statements.")?;
+		let blk = self.block()?;
+		// self.advance_end_of_statement()?;
+		Ok(Stmt::for_stmt(init, condition, inc, blk))
+	}
+
 	fn var_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
 		if self.check_identifier() {
 			let variable = self.expression()?;
@@ -105,7 +120,9 @@ impl Parser {
 		let mut conditionals = Vec::new();
 		let mut else_block = None;
 		loop {
+			self.consume(TokenType::LeftParen, "Expect ( for condition.")?;
 			let conditional = self.expression()?;
+			self.consume(TokenType::RightParen, "Expect ) for condition.")?;
 			self.consume(TokenType::LeftBrace, "Expect blocks for conditional statements.")?;
 			let blk = self.block()?;
 			conditionals.push((conditional, blk));
@@ -121,7 +138,9 @@ impl Parser {
 	}
 
 	fn while_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
+		self.consume(TokenType::LeftParen, "Expect ( for condition.")?;
 		let condition = self.expression()?;
+		self.consume(TokenType::RightParen, "Expect ) for condition.")?;
 		self.consume(TokenType::LeftBrace, "Expect blocks for conditional statements.")?;
 		let blk = self.block()?;
 		// self.advance_end_of_statement()?;

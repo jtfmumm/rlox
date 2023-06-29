@@ -12,6 +12,7 @@
 	"AssignStmt  : Rc<Expr> variable, Rc<Expr> value",
 	"BlockStmt   : Rc<Vec<Rc<Stmt>>> stmts",
 	"ExprStmt    : Rc<Expr> expr",
+	"ForStmt     : Rc<Stmt> init, Rc<Expr> condition, Rc<Stmt> inc, Rc<Stmt> block",
 	"IfStmt      : Rc<Vec<(Rc<Expr>-Rc<Stmt>)>> conditionals, Rc<Option<Rc<Stmt>>> else_block",
 	"PrintStmt   : Rc<Expr> expr",
 	"VarDeclStmt : Rc<Expr> variable, Rc<Expr> value",

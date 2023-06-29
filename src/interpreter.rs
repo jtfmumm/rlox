@@ -48,16 +48,6 @@ impl Interpreter {
 	fn execute(&mut self, stmt: Rc<Stmt>) -> Result<Object, EvalError> {
 		use Stmt::*;
 		match &*stmt {
-			VarDeclStmt { variable, value } => {
-				match &*variable.clone() {
-					Expr::Variable { name } => {
-						let val = self.evaluate(&value)?;
-						self.env.borrow_mut().declare(name, val)?;
-						Ok(Object::Nil)
-					},
-					_ => Err(EvalError::new("Expect declaration to declare variable."))
-				}
-			},
 			AssignStmt { variable, value } => {
 				match &*variable.clone() {
 					Expr::Variable { name } => {
@@ -68,14 +58,6 @@ impl Interpreter {
 					_ => Err(EvalError::new("Invalid assignment target."))
 				}
 			},
-			ExprStmt { expr } => {
-				self.evaluate(&expr)
-			},
-			PrintStmt { expr } => {
-				let obj = self.evaluate(&expr)?;
-				println!("{}", stringify_cli_result(&obj));
-				Ok(Object::Nil)
-			}
 			BlockStmt { stmts } => {
 				self.env = Environment::add_scope(self.env.clone());
 				match self.interpret(stmts.to_vec()) {
@@ -86,19 +68,19 @@ impl Interpreter {
 					Err(_) => Err(EvalError::new("Failed while evaluating block."))
 				}
 			},
-			WhileStmt { condition, block } => {
+			ExprStmt { expr } => {
+				self.evaluate(&expr)
+			},
+			ForStmt { init, condition, inc, block } => {
+				self.env = Environment::add_scope(self.env.clone());
+				self.execute(init.clone())?;
 				while is_truthy(&self.evaluate(condition)?) {
 					self.execute(block.clone())?;
+					self.execute(inc.clone())?;
 				}
+				self.env = self.env.clone().borrow().remove_scope()?;
 				Ok(Object::Nil)
 			},
-			// ForStmt { init, condition, inc, block } => {
-
-			// 	// while is_truthy(&self.evaluate(condition)?) {
-			// 	// 	self.execute(block.clone())?;
-			// 	// }
-			// 	// Ok(Object::Nil)
-			// },
 			IfStmt { conditionals, else_block } => {
 				for (c, blk) in conditionals.iter() {
 					if is_truthy(&self.evaluate(c)?) {
@@ -110,7 +92,28 @@ impl Interpreter {
 				} else {
 					Ok(Object::Nil)
 				}
-			}
+			},
+			PrintStmt { expr } => {
+				let obj = self.evaluate(&expr)?;
+				println!("{}", stringify_cli_result(&obj));
+				Ok(Object::Nil)
+			},
+			VarDeclStmt { variable, value } => {
+				match &*variable.clone() {
+					Expr::Variable { name } => {
+						let val = self.evaluate(&value)?;
+						self.env.borrow_mut().declare(name, val)?;
+						Ok(Object::Nil)
+					},
+					_ => Err(EvalError::new("Expect declaration to declare variable."))
+				}
+			},
+			WhileStmt { condition, block } => {
+				while is_truthy(&self.evaluate(condition)?) {
+					self.execute(block.clone())?;
+				}
+				Ok(Object::Nil)
+			},
 		}
 	}
 

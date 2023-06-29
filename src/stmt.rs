@@ -13,6 +13,7 @@ pub enum Stmt {
 	AssignStmt { variable: Rc<Expr>, value: Rc<Expr> },
 	BlockStmt { stmts: Rc<Vec<Rc<Stmt>>> },
 	ExprStmt { expr: Rc<Expr> },
+	ForStmt { init: Rc<Stmt>, condition: Rc<Expr>, inc: Rc<Stmt>, block: Rc<Stmt> },
 	IfStmt { conditionals: Rc<Vec<(Rc<Expr>,Rc<Stmt>)>>, else_block: Rc<Option<Rc<Stmt>>> },
 	PrintStmt { expr: Rc<Expr> },
 	VarDeclStmt { variable: Rc<Expr>, value: Rc<Expr> },
@@ -30,6 +31,10 @@ impl Stmt {
 
 	pub fn expr_stmt(expr: Rc<Expr>) -> Rc<Stmt> {
 		Rc::new(Stmt::ExprStmt { expr })
+	}
+
+	pub fn for_stmt(init: Rc<Stmt>, condition: Rc<Expr>, inc: Rc<Stmt>, block: Rc<Stmt>) -> Rc<Stmt> {
+		Rc::new(Stmt::ForStmt { init, condition, inc, block })
 	}
 
 	pub fn if_stmt(conditionals: Rc<Vec<(Rc<Expr>,Rc<Stmt>)>>, else_block: Rc<Option<Rc<Stmt>>>) -> Rc<Stmt> {
