@@ -38,7 +38,11 @@ impl Callable for Function {
 			}
 		);
 		// TODO: Call something!
-		interpreter.execute_with_env(self.body.clone(), scope.clone())
+		match interpreter.execute_with_env(self.body.clone(), scope.clone()) {
+			Ok(obj) => Ok(obj),
+			Err(EvalError::Fail(msg)) => Err(EvalError::new(&msg)),
+			Err(EvalError::Return) => Ok(Rc::new(Object::Nil)),
+		}
 		// Ok(Rc::new(Object::Nil))
 	}
 }

@@ -76,29 +76,40 @@ impl fmt::Display for ParseError {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct EvalError {
-	msg: String
+pub enum EvalError {
+	Return,
+	Fail(String)
 }
 
 impl EvalError {
 	pub fn new(msg: &str) -> Self {
-		EvalError { msg: msg.to_string() }
+		EvalError::Fail(msg.to_string())
 	}
 
 	pub fn new_with_context(token: Token, expr_str: &str, msg: &str) -> Self {
 		let location = expr_str.to_string();
 		let msg = format!("[line {}] Error at {}: {}", token.line, location, msg);
-		EvalError { msg }
+		EvalError::Fail(msg)
 	}
 
 	pub fn with_context(self, token: Token, expr_str: &str) -> Self {
-		let location = expr_str.to_string();
-		let msg = self.msg + &format!("\n[line {}] Error at {}", token.line, location);
-		EvalError { msg }
+		match self {
+			EvalError::Return => self,
+			EvalError::Fail(old_msg) => {
+				let location = expr_str.to_string();
+				let msg = old_msg.clone() + &format!("\n[line {}] Error at {}", token.line, location);
+				EvalError::Fail(msg)
+			}
+		}
 	}
 
 	pub fn report(&self) {
-		eprintln!("{}\n", self.msg);
+		match self {
+			EvalError::Return => {},
+			EvalError::Fail(msg) => {
+				eprintln!("{}\n", msg);
+			}
+		}
 	}
 }
 
@@ -106,6 +117,9 @@ impl Error for EvalError {}
 
 impl fmt::Display for EvalError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.msg)
+		match self {
+			EvalError::Return => write!(f, "{}", "Return"),
+			EvalError::Fail(msg) => write!(f, "{}", msg),
+		}
     }
 }

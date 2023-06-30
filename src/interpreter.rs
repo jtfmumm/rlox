@@ -19,7 +19,7 @@ pub struct Interpreter {
 impl Interpreter {
 	pub fn new() -> Self {
 		let global_env = Rc::new(RefCell::new(Environment::new()));
-		let local_env = Rc::new(RefCell::new(Environment::from_outer(global_env.clone())));
+		let local_env = Rc::new(RefCell::new(Environment::new()));
 		global_env.borrow_mut().declare("clock", Rc::new(Object::Fun(Rc::new(ClockFn {}))));
 		global_env.borrow_mut().declare("str", Rc::new(Object::Fun(Rc::new(StrFn {}))));
 
@@ -63,14 +63,26 @@ impl Interpreter {
 		use Stmt::*;
 		match &*stmt {
 			BlockStmt { stmts } => {
+				let mut last_error = None;
+				let mut last_res = Rc::new(Object::Nil);
 				self.local_env = Environment::add_scope(self.local_env.clone());
-				match self.interpret(stmts.to_vec()) {
-					Ok(obj) => {
-						self.local_env = self.local_env.clone().borrow().remove_scope()?;
-						Ok(obj)
-					},
-					Err(_) => Err(EvalError::new("Failed while evaluating block."))
+				for stmt in stmts.to_vec() {
+					match self.execute(stmt) {
+						Ok(obj) => {
+							last_res = obj.clone();
+							if self.is_repl {
+								println!("val: {}", stringify_cli_result(&obj));
+							}
+						},
+						Err(EvalError::Return) => return Err(EvalError::Return),
+						Err(err) => {
+							err.report();
+							last_error = Some(err);
+						}
+					}
 				}
+				self.local_env = self.local_env.clone().borrow().remove_scope()?;
+				if let Some(err) = last_error { Err(err) } else { Ok(last_res) }
 			},
 			ExprStmt { expr } => {
 				self.evaluate(&expr)
@@ -120,7 +132,11 @@ impl Interpreter {
 				Ok(Rc::new(Object::Nil))
 			},
 			ReturnStmt { expr } => {
-				self.evaluate(&expr)
+				let res = self.evaluate(&expr)?;
+				match &*res.clone() {
+					Object::Nil => Err(EvalError::Return),
+					_ => Ok(res)
+				}
 			},
 			VarDeclStmt { variable, value } => {
 				match &*variable.clone() {
@@ -195,7 +211,7 @@ impl Interpreter {
 				}
 			},
 			Variable { ref name } => {
-				Ok(self.local_env.borrow_mut().lookup(name.clone())?)
+				Ok(self.local_env.borrow_mut().lookup_with_backup_env(name.clone(), self.global_env.clone())?)
 			},
 		}
 	}

@@ -211,6 +211,9 @@ impl Parser {
 	}
 
 	fn return_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
+		if self.match_advance(&[TokenType::Semicolon]) {
+			return Ok(Stmt::return_stmt(Expr::literal(Rc::new(Object::Nil))))
+		}
 		let expr = self.expression()?;
 		self.advance_end_of_statement()?;
 		Ok(Stmt::return_stmt(expr))

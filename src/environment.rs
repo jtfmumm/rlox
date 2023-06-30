@@ -35,6 +35,13 @@ impl Environment {
 		self.env.insert(name.to_string(), value);
 	}
 
+	pub fn lookup_with_backup_env(&self, id: Token, env: Rc<RefCell<Environment>>) -> Result<Rc<Object>, EvalError> {
+		match self.lookup(id.clone()) {
+			Ok(res) => Ok(res),
+			Err(_) => env.borrow_mut().lookup(id)
+		}
+	}
+
 	pub fn lookup(&self, id: Token) -> Result<Rc<Object>, EvalError> {
 		let name = match id.ttype {
 			TokenType::Identifier(ref name) => name.clone(),
