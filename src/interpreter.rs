@@ -226,8 +226,8 @@ impl Interpreter {
 		match &*self.evaluate(callee)?.clone() {
 			Object::Fun(f) => {
 				if args.len() != f.arity() {
-					return Err(EvalError::new_with_context(paren.clone(), &callee.to_string(),
-						&format!("Expected {} arguments but got {}.", f.arity(), args.len())))
+					return Err(EvalError::new(&format!("Expected {} arguments but got {}.", f.arity(), args.len()))
+						.with_context(paren.clone(), &callee.to_string()))
 				}
 				let mut obj_args = Vec::new();
 				for arg in args.iter() {
@@ -235,8 +235,10 @@ impl Interpreter {
 				}
 				f.call(self, &obj_args)
 			},
-			_ => Err(EvalError::new_with_context(paren.clone(), &callee.to_string(),
-				"Can only call functions and classes."))
+			_ => Err(EvalError::new("Can only call functions and classes.")
+					.with_context(paren.clone(), &callee.to_string()))
+			// _ => Err(EvalError::new_with_context(paren.clone(), &callee.to_string(),
+				// "Can only call functions and classes."))
 		}
 	}
 

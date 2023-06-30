@@ -151,11 +151,14 @@ impl Parser {
 				if !self.match_advance(&[TokenType::Comma]) { break }
 			}
 			if params.len() >= 255 {
-				return Err(perror(self.peek()?.clone(), "Can't have more than 255 parameters."))
+				return Err(perror(self.peek_prev().clone(), "Can't have more than 255 parameters."))
 			}
 		}
 		self.consume(TokenType::RightParen, "Expect ')' after parameters.");
 		// self.consume(TokenType::LeftBrace, "Expect '{' before function body.");
+		if !self.check(&[TokenType::LeftBrace]) {
+			return Err(perror(self.peek()?.clone(), "Expect '{' before function body."))
+		}
 		let body = self.block()?;
 		Ok(Stmt::fun_stmt(name.clone(), Rc::new(params), body.clone()))
 	}
@@ -420,7 +423,7 @@ impl Parser {
 			if !self.match_advance(&[TokenType::Comma]) { break }
 		}
 		if args.len() >= 255 {
-			Err(perror(self.peek()?.clone(), "Can't have more than 255 arguments."))
+			Err(perror(self.peek_prev().clone(), "Can't have more than 255 arguments."))
 		} else {
 			Ok(Rc::new(args))
 		}
