@@ -1,5 +1,6 @@
 use crate::lox_error::LoxError;
 use crate::interpreter::Interpreter;
+use crate::object::Object;
 use crate::parser::Parser;
 use crate::scanner::Scanner;
 
@@ -7,6 +8,7 @@ use std::fs;
 use std::io;
 use std::io::Write;
 use std::process;
+use std::rc::Rc;
 
 
 const COMPILE_ERROR_CODE: i32 = 65;
@@ -26,7 +28,7 @@ impl Lox {
 	        .expect("Should have been able to read the file");
 
 		match self.run(contents) {
-			Ok(()) => {},
+			Ok(obj) => {},
 			Err(err) => {
 				match err {
 					LoxError::Parse => process::exit(COMPILE_ERROR_CODE),
@@ -56,7 +58,7 @@ impl Lox {
 	    Ok(())
 	}
 
-	fn run(&mut self, source: String) -> Result<(),LoxError> {
+	fn run(&mut self, source: String) -> Result<Rc<Object>,LoxError> {
 		let mut scanner = Scanner::new(source);
 		let tokens = scanner.scan_tokens()?;
 		// for t in &tokens {

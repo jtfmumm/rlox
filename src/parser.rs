@@ -62,6 +62,8 @@ impl Parser {
 			self.while_statement()
 		} else if self.match_advance(&[TokenType::For]) {
 			self.for_statement()
+		} else if self.match_advance(&[TokenType::Return]) {
+			self.return_statement()
 		} else {
 			self.expr_statement()
 		}
@@ -206,6 +208,12 @@ impl Parser {
 		self.consume(TokenType::RightParen, "Expect ) for condition.")?;
 		let blk = self.block()?;
 		Ok(Stmt::while_stmt(condition, blk))
+	}
+
+	fn return_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
+		let expr = self.expression()?;
+		self.advance_end_of_statement()?;
+		Ok(Stmt::return_stmt(expr))
 	}
 
 	fn expr_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {

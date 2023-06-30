@@ -17,6 +17,7 @@ pub enum Stmt {
 	FunStmt { name: Token, params: Rc<Vec<Token>>, body: Rc<Stmt> },
 	IfStmt { conditionals: Rc<Vec<(Rc<Expr>,Rc<Stmt>)>>, else_block: Rc<Option<Rc<Stmt>>> },
 	PrintStmt { expr: Rc<Expr> },
+	ReturnStmt { expr: Rc<Expr> },
 	VarDeclStmt { variable: Rc<Expr>, value: Rc<Expr> },
 	WhileStmt { condition: Rc<Expr>, block: Rc<Stmt> },
 }
@@ -44,6 +45,10 @@ impl Stmt {
 
 	pub fn print_stmt(expr: Rc<Expr>) -> Rc<Stmt> {
 		Rc::new(Stmt::PrintStmt { expr })
+	}
+
+	pub fn return_stmt(expr: Rc<Expr>) -> Rc<Stmt> {
+		Rc::new(Stmt::ReturnStmt { expr })
 	}
 
 	pub fn var_decl_stmt(variable: Rc<Expr>, value: Rc<Expr>) -> Rc<Stmt> {

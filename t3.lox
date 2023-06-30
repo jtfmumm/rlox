@@ -1,5 +1,5 @@
 fun add(a, b) {
-  print a + b;
+  return a + b;
 }
 
-print add; // "<fn add>".
+print add(1, 2);

@@ -16,6 +16,7 @@
     "FunStmt     : Token name, Rc<Vec<Token>> params, Rc<Stmt> body",
 	"IfStmt      : Rc<Vec<(Rc<Expr>-Rc<Stmt>)>> conditionals, Rc<Option<Rc<Stmt>>> else_block",
 	"PrintStmt   : Rc<Expr> expr",
+	"ReturnStmt  : Rc<Expr> expr",
 	"VarDeclStmt : Rc<Expr> variable, Rc<Expr> value",
 	"WhileStmt   : Rc<Expr> condition, Rc<Stmt> block"
 ]

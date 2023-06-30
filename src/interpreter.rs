@@ -30,13 +30,15 @@ impl Interpreter {
 		self.is_repl = true;
 	}
 
-	pub fn interpret(&mut self, stmts: Vec<Rc<Stmt>>) -> Result<(),LoxError> {
+	pub fn interpret(&mut self, stmts: Vec<Rc<Stmt>>) -> Result<Rc<Object>,LoxError> {
 		let mut hit_error = false;
+		let mut last_res = Rc::new(Object::Nil);
 		for stmt in stmts {
 			match self.execute(stmt) {
-				Ok(lit) => {
+				Ok(obj) => {
+					last_res = obj.clone();
 					if self.is_repl {
-						println!("val: {}", stringify_cli_result(&lit));
+						println!("val: {}", stringify_cli_result(&obj));
 					}
 				},
 				Err(err) => {
@@ -45,7 +47,7 @@ impl Interpreter {
 				}
 			}
 		}
-		if hit_error { Err(LoxError::Runtime) } else { Ok(()) }
+		if hit_error { Err(LoxError::Runtime) } else { Ok(last_res.clone()) }
 	}
 
 	pub fn execute_with_env(&mut self, stmt: Rc<Stmt>,
@@ -63,9 +65,9 @@ impl Interpreter {
 			BlockStmt { stmts } => {
 				self.local_env = Environment::add_scope(self.local_env.clone());
 				match self.interpret(stmts.to_vec()) {
-					Ok(()) => {
+					Ok(obj) => {
 						self.local_env = self.local_env.clone().borrow().remove_scope()?;
-						Ok(Rc::new(Object::Nil))
+						Ok(obj)
 					},
 					Err(_) => Err(EvalError::new("Failed while evaluating block."))
 				}
@@ -116,6 +118,9 @@ impl Interpreter {
 				let obj = self.evaluate(&expr)?;
 				println!("{}", stringify_cli_result(&obj));
 				Ok(Rc::new(Object::Nil))
+			},
+			ReturnStmt { expr } => {
+				self.evaluate(&expr)
 			},
 			VarDeclStmt { variable, value } => {
 				match &*variable.clone() {

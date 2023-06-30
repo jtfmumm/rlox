@@ -1,24 +1,20 @@
 
 
-fun hi() {
-	print "hi";
-}
-
 fun greet(name) {
-	print "hi " + name;
+	return "hi " + name;
 }
 
 fun dbl_greet(n1, n2) {
-	print n1 + " and " + n2;
+	return n1 + " and " + n2;
 }
 
-hi();
-greet("Bob");
-dbl_greet("Fred", "Mary");
+print greet("Bob");
+print dbl_greet("Fred", "Mary");
 
 
 fun add(a, b) {
-  print a + b;
+  return a + b;
 }
 
 print add; // "<fn add>".
+print add(1, 2);
