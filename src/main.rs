@@ -1,5 +1,6 @@
 mod builtins;
 mod callable;
+mod function;
 mod lox_error;
 mod expr;
 mod environment;

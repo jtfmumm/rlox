@@ -1,4 +1,5 @@
 use crate::builtins::{ClockFn, StrFn};
+use crate::function::Function;
 use crate::lox_error::{EvalError, LoxError};
 use crate::environment::Environment;
 use crate::expr::Expr;
@@ -47,6 +48,15 @@ impl Interpreter {
 		if hit_error { Err(LoxError::Runtime) } else { Ok(()) }
 	}
 
+	pub fn execute_with_env(&mut self, stmt: Rc<Stmt>,
+		                env: Rc<RefCell<Environment>>) -> Result<Rc<Object>, EvalError> {
+		let prev_env = self.local_env.clone();
+		self.local_env = env;
+		let res = self.execute(stmt);
+		self.local_env = prev_env;
+		res
+	}
+
 	fn execute(&mut self, stmt: Rc<Stmt>) -> Result<Rc<Object>, EvalError> {
 		use Stmt::*;
 		match &*stmt {
@@ -79,8 +89,16 @@ impl Interpreter {
 				Ok(Rc::new(Object::Nil))
 			},
 			FunStmt { name, params, body } => {
+				let f = Rc::new(Function::new(name.clone(), params.clone(), body.clone()));
+				let fobj = Rc::new(Object::Fun(f));
+				match name.ttype.clone() {
+					TokenType::Identifier(name) => {
+						self.local_env.borrow_mut().declare(&name, fobj.clone());
+					},
+					_ => unreachable!()
+				}
 
-				Err(EvalError::new("Not implemented yet!"))
+				Ok(fobj)
 			},
 			IfStmt { conditionals, else_block } => {
 				for (c, blk) in conditionals.iter() {
@@ -192,7 +210,7 @@ impl Interpreter {
 				for arg in args.iter() {
 					obj_args.push(self.evaluate(arg)?);
 				}
-				Ok(f.call(self, &obj_args))
+				f.call(self, &obj_args)
 			},
 			_ => Err(EvalError::new_with_context(paren.clone(), &callee.to_string(),
 				"Can only call functions and classes."))

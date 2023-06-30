@@ -153,7 +153,7 @@ impl Parser {
 			}
 		}
 		self.consume(TokenType::RightParen, "Expect ')' after parameters.");
-		self.consume(TokenType::LeftBrace, "Expect '{' before function body.");
+		// self.consume(TokenType::LeftBrace, "Expect '{' before function body.");
 		let body = self.block()?;
 		Ok(Stmt::fun_stmt(name.clone(), Rc::new(params), body.clone()))
 	}
@@ -400,11 +400,12 @@ impl Parser {
 	fn call_args(&mut self) -> Result<Rc<Vec<Rc<Expr>>>, ParseError> {
 		let mut args = Vec::new();
 		loop {
-			if self.check_identifier() {
-				args.push(self.expression()?);
-			} else {
-				return Err(perror(self.peek_prev().clone(), "Expect variable."))
-			}
+			args.push(self.expression()?);
+			// if self.check_identifier() {
+			// 	args.push(self.expression()?);
+			// } else {
+			// 	return Err(perror(self.peek_prev().clone(), "Expect variable."))
+			// }
 			if !self.match_advance(&[TokenType::Comma]) { break }
 		}
 		if args.len() >= 255 {
