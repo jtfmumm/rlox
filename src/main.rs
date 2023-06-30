@@ -1,4 +1,6 @@
-mod cerror;
+mod builtins;
+mod callable;
+mod lox_error;
 mod expr;
 mod environment;
 mod interpreter;
@@ -15,7 +17,6 @@ use std::env;
 use std::process;
 
 fn main() {
-  // println!("\n");
   let args: Vec<_> = env::args().collect();
   let mut lox = Lox::new();
   if args.len() > 2 {

@@ -1,4 +1,4 @@
-use crate::cerror::{LoxError, perror, ParseError};
+use crate::lox_error::{LoxError, perror, ParseError};
 use crate::expr::Expr;
 use crate::object::Object;
 use crate::stmt::Stmt;
@@ -19,7 +19,7 @@ impl Parser {
 		Parser { tokens: tokens.into_iter().peekable(), prev }
 	}
 
-	pub fn parse(&mut self) -> Result<Vec<Rc<Stmt>>, LoxError> {//Result<Rc<Expr>, String> {
+	pub fn parse(&mut self) -> Result<Vec<Rc<Stmt>>, LoxError> {
 		let mut stmts = Vec::new();
 		let mut failed = false;
 		while self.tokens.peek().unwrap().ttype != TokenType::Eof {
@@ -42,7 +42,9 @@ impl Parser {
 	}
 
 	fn declaration(&mut self) -> Result<Rc<Stmt>, ParseError> {
-		if self.match_advance(&[TokenType::Var]) {
+		if self.match_advance(&[TokenType::Fun]) {
+			self.fun_statement()
+		} else if self.match_advance(&[TokenType::Var]) {
 			self.var_statement()
 		} else {
 			self.statement()
@@ -50,8 +52,6 @@ impl Parser {
 	}
 
 	fn statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
-		// if self.match_advance(&[TokenType::Var]) {
-		// 	self.var_statement()
 		if self.match_advance(&[TokenType::Print]) {
 			self.print_statement()
 		} else if self.check(&[TokenType::LeftBrace]) {
@@ -124,10 +124,38 @@ impl Parser {
 			self.consume(TokenType::RightParen, "Expect ) for end of for.")?;
 			expr
 		};
-		// self.consume(TokenType::LeftBrace, "Expect blocks for conditional statements.")?;
 		let blk = self.block()?;
-		// self.advance_end_of_statement()?;
 		Ok(Stmt::for_stmt(Rc::new(init), Rc::new(condition), Rc::new(inc), blk))
+	}
+
+	fn fun_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
+		let name = if self.check_identifier() {
+			self.advance()?.clone()
+		} else {
+			return Err(perror(self.peek()?.clone(), "Expect function name."))
+		};
+		self.consume(TokenType::LeftParen, "Expect '(' after function name.");
+		let mut params = Vec::new();
+		if !self.check(&[TokenType::RightParen]) {
+			loop {
+				if self.check_identifier() {
+					match &*self.expression()?.clone() {
+						Expr::Variable { name } => params.push(name.clone()),
+						_ => unreachable!()
+					}
+				} else {
+					return Err(perror(self.peek()?.clone(), "Expect parameter name."))
+				}
+				if !self.match_advance(&[TokenType::Comma]) { break }
+			}
+			if params.len() >= 255 {
+				return Err(perror(self.peek()?.clone(), "Can't have more than 255 parameters."))
+			}
+		}
+		self.consume(TokenType::RightParen, "Expect ')' after parameters.");
+		self.consume(TokenType::LeftBrace, "Expect '{' before function body.");
+		let body = self.block()?;
+		Ok(Stmt::fun_stmt(name.clone(), Rc::new(params), body.clone()))
 	}
 
 	fn var_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
@@ -137,7 +165,7 @@ impl Parser {
 					(variable.clone(), value.clone())
 				},
 				Expr::Variable { name } => {
-					(Expr::variable(name.clone()), Expr::literal(Object::Nil))
+					(Expr::variable(name.clone()), Expr::literal(Rc::new(Object::Nil)))
 				}
 				_ => return Err(perror(self.peek_prev().clone(), "Invalid declaration"))
 			};
@@ -161,17 +189,14 @@ impl Parser {
 			self.consume(TokenType::LeftParen, "Expect ( for condition.")?;
 			let conditional = self.expression()?;
 			self.consume(TokenType::RightParen, "Expect ) for condition.")?;
-			// self.consume(TokenType::LeftBrace, "Expect blocks for conditional statements.")?;
 			let blk = self.block()?;
 			conditionals.push((conditional, blk));
 			if !self.match_advance(&[TokenType::Elif]) { break }
 		}
 		if self.match_advance(&[TokenType::Else]) {
-			// self.consume(TokenType::LeftBrace, "Expect blocks for else statements.")?;
 			let stmt = self.statement()?;
 			else_block = Some(stmt);
 		}
-		// self.advance_end_of_statement()?;
 		Ok(Stmt::if_stmt(Rc::new(conditionals), Rc::new(else_block)))
 	}
 
@@ -179,27 +204,9 @@ impl Parser {
 		self.consume(TokenType::LeftParen, "Expect ( for condition.")?;
 		let condition = self.expression()?;
 		self.consume(TokenType::RightParen, "Expect ) for condition.")?;
-		// self.consume(TokenType::LeftBrace, "Expect blocks for conditional statements.")?;
 		let blk = self.block()?;
-		// self.advance_end_of_statement()?;
 		Ok(Stmt::while_stmt(condition, blk))
 	}
-
-	// fn assign_statement(&mut self, expect_semicolon: bool) -> Result<Rc<Stmt>, ParseError> {
-	// 	let expr = self.expression()?;
-
-	// 	if self.match_advance(&[TokenType::Equal]) {
-	// 		let value = self.expression()?;
-	// 		if expect_semicolon {
-	// 			self.advance_end_of_statement()?;
-	// 		}
-	// 		return Ok(Stmt::assign_stmt(expr, value))
-	// 	}
-
-	// 	// Not an assignment
-	// 	self.advance_end_of_statement()?;
-	// 	Ok(Stmt::expr_stmt(expr))
-	// }
 
 	fn expr_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
 		let expr = self.expression()?;
@@ -233,14 +240,6 @@ impl Parser {
 		if is_match { self.prev = self.tokens.next().take().unwrap(); }
 		is_match
 	}
-
-	// fn identifier_match(&mut self) -> bool {
-	// 	self.tokens.peek().map(|t| {
-	// 		match t.ttype {
-	// 			TokenType::Identifier(_) => true,
-	// 			_ => false
-	// 		}}).unwrap_or(false)
-	// }
 
 	fn check(&mut self, matches: &[TokenType]) -> bool {
 		self.tokens.peek().map(|t| {
@@ -368,7 +367,50 @@ impl Parser {
 			let right = self.unary()?;
 			Ok(Expr::unary(op, right))
 		} else {
-			Ok(self.primary()?)
+			Ok(self.call()?)
+		}
+	}
+
+	fn call(&mut self) -> Result<Rc<Expr>, ParseError> {
+		let mut expr = self.primary()?;
+
+		loop {
+			if self.match_advance(&[TokenType::LeftParen]) {
+				expr = self.build_call(expr)?;
+			} else {
+				break
+			}
+		}
+		Ok(expr)
+	}
+
+	fn build_call(&mut self, expr: Rc<Expr>) -> Result<Rc<Expr>, ParseError> {
+		let args = if self.check(&[TokenType::RightParen]) {
+			Rc::new(Vec::new())
+		} else {
+			self.call_args()?
+		};
+		if self.check(&[TokenType::RightParen]) {
+			Ok(Expr::call(expr, self.advance()?.clone(), args))
+		} else {
+			Err(perror(self.peek()?.clone(), "Expect )."))
+		}
+	}
+
+	fn call_args(&mut self) -> Result<Rc<Vec<Rc<Expr>>>, ParseError> {
+		let mut args = Vec::new();
+		loop {
+			if self.check_identifier() {
+				args.push(self.expression()?);
+			} else {
+				return Err(perror(self.peek_prev().clone(), "Expect variable."))
+			}
+			if !self.match_advance(&[TokenType::Comma]) { break }
+		}
+		if args.len() >= 255 {
+			Err(perror(self.peek()?.clone(), "Can't have more than 255 arguments."))
+		} else {
+			Ok(Rc::new(args))
 		}
 	}
 
@@ -379,26 +421,20 @@ impl Parser {
 		}
 		let token = &self.advance()?;
 		match &token.ttype {
-			False => Ok(Expr::literal(Object::Bool(false))),
-			True => Ok(Expr::literal(Object::Bool(true))),
-			Nil => Ok(Expr::literal(Object::Nil)),
-			Number(n) => Ok(Expr::literal(Object::Num(*n))),
+			False => Ok(Expr::literal(Rc::new(Object::Bool(false)))),
+			True => Ok(Expr::literal(Rc::new(Object::Bool(true)))),
+			Nil => Ok(Expr::literal(Rc::new(Object::Nil))),
+			Number(n) => Ok(Expr::literal(Rc::new(Object::Num(*n)))),
 			StringLit(_) => {
 				let s = self.peek_prev().literal.clone();
-				// TODO: Why does the StringLit string pick up quotes
-				// at beginning and end? I'm removing them here.
+				// TODO: This doesn't handle unicode correctly.
 				let s2 = s[1..s.len() - 1].to_string();
-				Ok(Expr::literal(Object::Str(s2)))
+				Ok(Expr::literal(Rc::new(Object::Str(s2))))
 			},
 			LeftParen => {
 				let expr = self.expression()?;
 				self.consume(TokenType::RightParen, "Expect )!")?;
 				Ok(Expr::grouping(expr))
-			},
-			LeftBrace => {
-				let expr = self.expression()?;
-				self.consume(TokenType::RightBrace, "Expect }!")?;
-				Ok(Expr::block(expr))
 			},
 			Identifier(_) => Ok(Expr::variable(token.clone().clone())),
 			_ => {
@@ -421,11 +457,6 @@ impl Parser {
 				return Ok(())
 			}
 
-			// match self.peek()?.ttype {
-			// 	Class | Fun | Var | For | If
-			// 	| While | Print | Return => return Ok(()),
-			// 	_ => {}
-			// }
 			self.advance()?;
 		}
 	}

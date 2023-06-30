@@ -1,4 +1,5 @@
-use crate::cerror::{EvalError, LoxError};
+use crate::builtins::{ClockFn, StrFn};
+use crate::lox_error::{EvalError, LoxError};
 use crate::environment::Environment;
 use crate::expr::Expr;
 use crate::object::{Object, stringify_cli_result};
@@ -10,12 +11,18 @@ use std::rc::Rc;
 
 pub struct Interpreter {
 	is_repl: bool,
-	env: Rc<RefCell<Environment>>
+	global_env: Rc<RefCell<Environment>>,
+	local_env: Rc<RefCell<Environment>>
 }
 
 impl Interpreter {
 	pub fn new() -> Self {
-		Interpreter { is_repl: false, env: Rc::new(RefCell::new(Environment::new())) }
+		let global_env = Rc::new(RefCell::new(Environment::new()));
+		let local_env = Rc::new(RefCell::new(Environment::from_outer(global_env.clone())));
+		global_env.borrow_mut().declare("clock", Rc::new(Object::Fun(Rc::new(ClockFn {}))));
+		global_env.borrow_mut().declare("str", Rc::new(Object::Fun(Rc::new(StrFn {}))));
+
+		Interpreter { is_repl: false, global_env, local_env }
 	}
 
 	pub fn repl(&mut self) {
@@ -40,15 +47,15 @@ impl Interpreter {
 		if hit_error { Err(LoxError::Runtime) } else { Ok(()) }
 	}
 
-	fn execute(&mut self, stmt: Rc<Stmt>) -> Result<Object, EvalError> {
+	fn execute(&mut self, stmt: Rc<Stmt>) -> Result<Rc<Object>, EvalError> {
 		use Stmt::*;
 		match &*stmt {
 			BlockStmt { stmts } => {
-				self.env = Environment::add_scope(self.env.clone());
+				self.local_env = Environment::add_scope(self.local_env.clone());
 				match self.interpret(stmts.to_vec()) {
 					Ok(()) => {
-						self.env = self.env.clone().borrow().remove_scope()?;
-						Ok(Object::Nil)
+						self.local_env = self.local_env.clone().borrow().remove_scope()?;
+						Ok(Rc::new(Object::Nil))
 					},
 					Err(_) => Err(EvalError::new("Failed while evaluating block."))
 				}
@@ -57,19 +64,23 @@ impl Interpreter {
 				self.evaluate(&expr)
 			},
 			ForStmt { init, condition, inc, block } => {
-				self.env = Environment::add_scope(self.env.clone());
+				self.local_env = Environment::add_scope(self.local_env.clone());
 				if let Some(stmt) = &*init.clone() { self.execute(stmt.clone())?; }
 				let cond = if let Some(ref exp) = &*condition.clone() {
 					exp.clone()
 				} else {
-					Expr::literal(Object::Bool(true))
+					Expr::literal(Rc::new(Object::Bool(true)))
 				};
 				while is_truthy(&self.evaluate(&cond)?) {
 					self.execute(block.clone())?;
 					if let Some(expr) = &*inc.clone() { self.evaluate(&*expr.clone())?; }
 				}
-				self.env = self.env.clone().borrow().remove_scope()?;
-				Ok(Object::Nil)
+				self.local_env = self.local_env.clone().borrow().remove_scope()?;
+				Ok(Rc::new(Object::Nil))
+			},
+			FunStmt { name, params, body } => {
+
+				Err(EvalError::new("Not implemented yet!"))
 			},
 			IfStmt { conditionals, else_block } => {
 				for (c, blk) in conditionals.iter() {
@@ -80,20 +91,25 @@ impl Interpreter {
 				if let Some(blk) = &*else_block.clone() {
 					self.execute(blk.clone())
 				} else {
-					Ok(Object::Nil)
+					Ok(Rc::new(Object::Nil))
 				}
 			},
 			PrintStmt { expr } => {
 				let obj = self.evaluate(&expr)?;
 				println!("{}", stringify_cli_result(&obj));
-				Ok(Object::Nil)
+				Ok(Rc::new(Object::Nil))
 			},
 			VarDeclStmt { variable, value } => {
 				match &*variable.clone() {
 					Expr::Variable { name } => {
 						let val = self.evaluate(&value)?;
-						self.env.borrow_mut().declare(name.clone(), val)?;
-						Ok(Object::Nil)
+						match name.ttype {
+							TokenType::Identifier(ref nm) => {
+								self.local_env.borrow_mut().declare(nm, val.clone());
+							},
+							_ => unreachable!()
+						}
+						Ok(Rc::new(Object::Nil))
 					},
 					_ => Err(EvalError::new("Expect declaration to declare variable."))
 				}
@@ -102,12 +118,12 @@ impl Interpreter {
 				while is_truthy(&self.evaluate(condition)?) {
 					self.execute(block.clone())?;
 				}
-				Ok(Object::Nil)
+				Ok(Rc::new(Object::Nil))
 			},
 		}
 	}
 
-	pub fn evaluate(&mut self, expr: &Expr) -> Result<Object, EvalError> {
+	pub fn evaluate(&mut self, expr: &Expr) -> Result<Rc<Object>, EvalError> {
 		use Expr::*;
 
 		match expr {
@@ -115,7 +131,7 @@ impl Interpreter {
 				match &*variable.clone() {
 					Expr::Variable { name } => {
 						let val = self.evaluate(&value)?;
-						self.env.borrow_mut().assign(name.clone(), val.clone())?;
+						self.local_env.borrow_mut().assign(name.clone(), val.clone())?;
 						Ok(val)
 					},
 					_ => Err(EvalError::new("Invalid assignment target."))
@@ -127,22 +143,21 @@ impl Interpreter {
 					Err(everr) => Err(everr.with_context(operator.clone(), &expr.to_string())),
 				}
 			},
-			Block { ref expression } => {
-				self.eval_block(expression)
+			Call { ref callee, ref paren, ref args } => {
+				self.eval_call(callee, paren, args)
 			},
 			Grouping { ref expression } => {
 				self.eval_grouping(expression)
 			},
 			Literal { ref value } => {
 				use self::Object::*;
-				Ok(match value {
-					Nil => Nil.clone(),
+				Ok(Rc::new(match &*value.clone() {
+					Nil => Nil,
 					Bool(b) => Bool(*b),
 					Num(n) => Num(*n),
 					Str(s) => Str(s.clone()),
-					// TODO: This shouldn't happen
-					// Variable { name } => Variable { name: name.clone() },
-				})
+					Fun(f) => Fun(f.clone()),
+				}))
 			},
 			Logic { ref left, ref operator, ref right } => {
 				match self.eval_logic(left, operator, right) {
@@ -157,63 +172,72 @@ impl Interpreter {
 				}
 			},
 			Variable { ref name } => {
-				Ok(self.env.borrow_mut().lookup(name.clone())?)
+				Ok(self.local_env.borrow_mut().lookup(name.clone())?)
 			},
 		}
 	}
 
-	pub fn eval_grouping(&mut self, expr: &Expr) -> Result<Object, EvalError> {
+	pub fn eval_grouping(&mut self, expr: &Expr) -> Result<Rc<Object>, EvalError> {
 		self.evaluate(expr)
 	}
 
-	pub fn eval_block(&mut self, expr: &Expr) -> Result<Object, EvalError> {
-		// TODO: It seems this code will never run. I'll stick this here for now.
-		assert!(false);
-		self.env = Environment::add_scope(self.env.clone());
-		let obj = self.evaluate(expr);
-		self.env = self.env.clone().borrow().remove_scope()?;
-		obj
+	pub fn eval_call(&mut self, callee: &Expr, paren: &Token, args: &Vec<Rc<Expr>>) -> Result<Rc<Object>, EvalError> {
+		match &*self.evaluate(callee)?.clone() {
+			Object::Fun(f) => {
+				if args.len() != f.arity() {
+					return Err(EvalError::new_with_context(paren.clone(), &callee.to_string(),
+						&format!("Expected {} arguments but got {}.", f.arity(), args.len())))
+				}
+				let mut obj_args = Vec::new();
+				for arg in args.iter() {
+					obj_args.push(self.evaluate(arg)?);
+				}
+				Ok(f.call(self, &obj_args))
+			},
+			_ => Err(EvalError::new_with_context(paren.clone(), &callee.to_string(),
+				"Can only call functions and classes."))
+		}
 	}
 
-	pub fn eval_unary(&mut self, op: &Token, right: &Expr) -> Result<Object, EvalError> {
+	pub fn eval_unary(&mut self, op: &Token, right: &Expr) -> Result<Rc<Object>, EvalError> {
 		let r = self.evaluate(right)?;
 
 		use TokenType::*;
 		use self::Object::*;
-		match &op.ttype {
-			Bang => Ok(Bool(!(is_truthy(&r)))),
+		Ok(Rc::new(match &op.ttype {
+			Bang => Bool(!(is_truthy(&r))),
 			Minus => {
-				match r {
-					Num(n) => Ok(Num(-n)),
-					_ => Err(EvalError::new("Operand must be a number."))
+				match &*r.clone() {
+					Num(n) => Num(-n),
+					_ => return Err(EvalError::new("Operand must be a number."))
 				}
 			}
-			tt => Err(EvalError::new(&format!("eval_unary: Invalid operator! {:?}", tt)))
-		}
+			tt => return Err(EvalError::new(&format!("eval_unary: Invalid operator! {:?}", tt)))
+		}))
 	}
 
-	pub fn eval_binary(&mut self, left: &Expr, operator: &Token, right: &Expr) -> Result<Object, EvalError> {
+	pub fn eval_binary(&mut self, left: &Expr, operator: &Token, right: &Expr) -> Result<Rc<Object>, EvalError> {
 		let l = self.evaluate(left)?;
 		let r = self.evaluate(right)?;
 
 		use TokenType::*;
 		use self::Object::*;
-		match &operator.ttype {
-			BangEqual => Ok(Bool(!is_equal(l, r))),
-			EqualEqual => Ok(Bool(is_equal(l, r))),
-			Greater => Ok(Bool(as_num(l)? > as_num(r)?)),
-			GreaterEqual => Ok(Bool(as_num(l)? >= as_num(r)?)),
-			Less => Ok(Bool(as_num(l)? < as_num(r)?)),
-			LessEqual => Ok(Bool(as_num(l)? <= as_num(r)?)),
-			Minus => Ok(Num(as_num(l)? - as_num(r)?)),
-			Plus => Ok(eval_plus(l, r)?),
-			Slash => Ok(eval_div(l, r)?),
-			Star => Ok(Num(as_num(l)? * as_num(r)?)),
-			tt => Err(EvalError::new(&format!("eval_binary: Invalid operator! {:?}", tt)))
-		}
+		Ok(Rc::new(match &operator.ttype {
+			BangEqual => Bool(!is_equal(l, r)),
+			EqualEqual => Bool(is_equal(l, r)),
+			Greater => Bool(as_num(l)? > as_num(r)?),
+			GreaterEqual => Bool(as_num(l)? >= as_num(r)?),
+			Less => Bool(as_num(l)? < as_num(r)?),
+			LessEqual => Bool(as_num(l)? <= as_num(r)?),
+			Minus => Num(as_num(l)? - as_num(r)?),
+			Plus => eval_plus(l, r)?,
+			Slash => eval_div(l, r)?,
+			Star => Num(as_num(l)? * as_num(r)?),
+			tt => return Err(EvalError::new(&format!("eval_binary: Invalid operator! {:?}", tt)))
+		}))
 	}
 
-	pub fn eval_logic(&mut self, left: &Expr, operator: &Token, right: &Expr) -> Result<Object, EvalError> {
+	pub fn eval_logic(&mut self, left: &Expr, operator: &Token, right: &Expr) -> Result<Rc<Object>, EvalError> {
 		debug_assert!(operator.ttype == TokenType::And || operator.ttype == TokenType::Or);
 		let l = self.evaluate(left)?;
 
@@ -225,10 +249,10 @@ impl Interpreter {
 	}
 }
 
-fn eval_plus(l: Object, r: Object) -> Result<Object, EvalError> {
+fn eval_plus(l: Rc<Object>, r: Rc<Object>) -> Result<Object, EvalError> {
 	use self::Object::*;
 	let err = Err(EvalError::new("Operands must be two numbers or two strings."));
-	match l {
+	match &*l {
 		Num(n) => {
 			let n2 = as_num(r);
 			if n2.is_err() { return err }
@@ -237,13 +261,13 @@ fn eval_plus(l: Object, r: Object) -> Result<Object, EvalError> {
 		Str(s) => {
 			let s2 = &as_str(r);
 			if s2.is_err() { return err }
-			Ok(Str(s + &s2.as_ref().unwrap()))
+			Ok(Str(s.to_string() + s2.as_ref().unwrap()))
 		},
 		_ => err
 	}
 }
 
-fn eval_div(l: Object, r: Object) -> Result<Object, EvalError> {
+fn eval_div(l: Rc<Object>, r: Rc<Object>) -> Result<Object, EvalError> {
 	let divisor = as_num(r)?;
 	if divisor == 0.0  {
 		return Err(EvalError::new(&format!("Tried to divide by 0!")))
@@ -252,20 +276,20 @@ fn eval_div(l: Object, r: Object) -> Result<Object, EvalError> {
 	Ok(Object::Num(res))
 }
 
-fn is_truthy(obj: &Object) -> bool {
+fn is_truthy(obj: &Rc<Object>) -> bool {
 	use self::Object::*;
-	match obj {
+	match &*obj.clone() {
 		Bool(b) => *b,
-		Num(_) | Str(_) => true,
+		Num(_) | Str(_) | Fun(_) => true,
 		Nil => false,
 	}
 }
 
 // In Lox you can compare different types, but
 // that returns false.
-fn is_equal(l: Object, r: Object) -> bool {
+fn is_equal(l: Rc<Object>, r: Rc<Object>) -> bool {
 	use self::Object::*;
-	match (l, r) {
+	match (&*l, &*r) {
 		(Bool(b1), Bool(b2)) => b1 == b2,
 		(Num(n1), Num(n2)) => n1 == n2,
 		(Str(s1), Str(s2)) => s1 == s2,
@@ -282,17 +306,17 @@ fn is_equal(l: Object, r: Object) -> bool {
 // 	}
 // }
 
-fn as_num(obj: Object) -> Result<f64, EvalError> {
+fn as_num(obj: Rc<Object>) -> Result<f64, EvalError> {
 	use self::Object::*;
-	match obj {
-		Num(n) => Ok(n),
+	match &*obj {
+		Num(n) => Ok(*n),
 		_ => Err(EvalError::new("Operands must be numbers."))
 	}
 }
 
-fn as_str(obj: Object) -> Result<String, EvalError> {
+fn as_str(obj: Rc<Object>) -> Result<String, EvalError> {
 	use self::Object::*;
-	match obj {
+	match &*obj {
 		Str(s) => Ok(s.to_owned()),
 		_ => Err(EvalError::new("Operands must be strings."))
 	}

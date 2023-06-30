@@ -2,9 +2,9 @@
 "Expr": [
 	"Assign   : Rc<Expr> variable, Rc<Expr> value",
 	"Binary   : Rc<Expr> left, Token operator, Rc<Expr> right",
-	"Block    : Rc<Expr> expression",
+	"Call     : Rc<Expr> callee, Token paren, Rc<Vec<Rc<Expr>>> args",
 	"Grouping : Rc<Expr> expression",
-	"Literal  : Object value",
+	"Literal  : Rc<Object> value",
 	"Logic    : Rc<Expr> left, Token operator, Rc<Expr> right",
 	"Unary    : Token operator, Rc<Expr> right",
 	"Variable : Token name"
@@ -13,6 +13,7 @@
 	"BlockStmt   : Rc<Vec<Rc<Stmt>>> stmts",
 	"ExprStmt    : Rc<Expr> expr",
 	"ForStmt     : Rc<Option<Rc<Stmt>>> init, Rc<Option<Rc<Expr>>> condition, Rc<Option<Rc<Expr>>> inc, Rc<Stmt> block",
+    "FunStmt     : Token name, Rc<Vec<Token>> params, Rc<Stmt> body",
 	"IfStmt      : Rc<Vec<(Rc<Expr>-Rc<Stmt>)>> conditionals, Rc<Option<Rc<Stmt>>> else_block",
 	"PrintStmt   : Rc<Expr> expr",
 	"VarDeclStmt : Rc<Expr> variable, Rc<Expr> value",

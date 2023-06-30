@@ -94,6 +94,7 @@ gen_source(expr_prelude, 'Expr', 'ast_def.json', 'src/expr.rs')
 
 stmt_prelude = """
 use crate::expr::Expr;
+use crate::token::Token;
 """
 
 gen_source(stmt_prelude, 'Stmt', 'ast_def.json', 'src/stmt.rs')

@@ -13,9 +13,9 @@ use std::rc::Rc;
 pub enum Expr {
 	Assign { variable: Rc<Expr>, value: Rc<Expr> },
 	Binary { left: Rc<Expr>, operator: Token, right: Rc<Expr> },
-	Block { expression: Rc<Expr> },
+	Call { callee: Rc<Expr>, paren: Token, args: Rc<Vec<Rc<Expr>>> },
 	Grouping { expression: Rc<Expr> },
-	Literal { value: Object },
+	Literal { value: Rc<Object> },
 	Logic { left: Rc<Expr>, operator: Token, right: Rc<Expr> },
 	Unary { operator: Token, right: Rc<Expr> },
 	Variable { name: Token },
@@ -30,15 +30,15 @@ impl Expr {
 		Rc::new(Expr::Binary { left, operator, right })
 	}
 
-	pub fn block(expression: Rc<Expr>) -> Rc<Expr> {
-		Rc::new(Expr::Block { expression })
+	pub fn call(callee: Rc<Expr>, paren: Token, args: Rc<Vec<Rc<Expr>>>) -> Rc<Expr> {
+		Rc::new(Expr::Call { callee, paren, args })
 	}
 
 	pub fn grouping(expression: Rc<Expr>) -> Rc<Expr> {
 		Rc::new(Expr::Grouping { expression })
 	}
 
-	pub fn literal(value: Object) -> Rc<Expr> {
+	pub fn literal(value: Rc<Object>) -> Rc<Expr> {
 		Rc::new(Expr::Literal { value })
 	}
 

@@ -1,4 +1,4 @@
-use crate::cerror::{LoxError, scerror};
+use crate::lox_error::{LoxError, ScannerError, scerror};
 use crate::token::{Token, TokenType};
 
 use std::mem;
@@ -14,7 +14,6 @@ pub struct Scanner {
 	start: usize,
 	current: usize,
 	line: u32,
-	hit_error: bool,
 }
 
 impl Scanner {
@@ -23,21 +22,17 @@ impl Scanner {
 		let start = 0;
 		let current = 0;
 		let line = 1;
-		Scanner { source_string: s, source, tokens: Vec::new(), start, current, line, hit_error: false }
+		Scanner { source_string: s, source, tokens: Vec::new(), start, current, line }
 	}
 
 	pub fn scan_tokens(&mut self) -> Result<Vec<Token>,LoxError> {
 		while !self.is_at_end() {
 			self.start = self.current;
-			self.scan_token()
+			if self.scan_token().is_err() { return Err(LoxError::Scan) }
 		}
 
 		self.tokens.push(Token::new(TokenType::Eof, "".to_string(), "".to_string(), self.line));
-		if !self.hit_error {
-			Ok(mem::replace(&mut self.tokens, Vec::new()))
-		} else {
-			Err(LoxError::Scan)
-		}
+		Ok(mem::replace(&mut self.tokens, Vec::new()))
 	}
 
 	fn is_at_end(&self) -> bool {
@@ -68,12 +63,11 @@ impl Scanner {
 		}
 	}
 
-	fn report_error(&mut self, msg: &str) {
-		self.hit_error = true;
-		scerror(self.line, msg);
+	fn report_error(&mut self, msg: &str) -> ScannerError {
+		scerror(self.line, msg)
 	}
 
-	fn scan_token(&mut self) {
+	fn scan_token(&mut self) -> Result<(),ScannerError> {
 		let ch = self.advance();
 		let token_type = match ch {
 			'(' => TokenType::LeftParen,
@@ -100,65 +94,66 @@ impl Scanner {
 			},
 			'/' => {
 				if self.match_advance('/') {
-					while !(self.is_at_end() || self.peek() == '\n')  { self.current += 1; }; return
+					while !(self.is_at_end() || self.peek() == '\n')  { self.current += 1; }; return Ok(())
 				} else if self.match_advance('*') {
 					while !self.is_at_end() && !(self.peek() == '*' && self.peek_next() == '/') {
 						self.current += 1;
 					}
 					if self.is_at_end() {
-						self.report_error("You must close multiline comments with */");
+						return Err(self.report_error("You must close multiline comments with */"))
 					} else {
 						self.current += 2;
 					}
-					return
+					return Ok(())
 				} else {
 					TokenType::Slash
 				}
 			}
-			'"' => self.scan_string(),
-			a if a.is_alphabetic() => self.scan_word(),
-			d if d.is_digit(10) => self.scan_number(),
-			' ' | '\r' | '\t' => return,
-			'\n' => { self.line += 1; return },
-			_ => { self.report_error("Unexpected character."); TokenType::Error }
+			'"' => self.scan_string()?,
+			a if a.is_alphabetic() => self.scan_word()?,
+			d if d.is_digit(10) => self.scan_number()?,
+			' ' | '\r' | '\t' => return Ok(()),
+			'\n' => { self.line += 1; return Ok(()) },
+			_ => { return Err(self.report_error("Unexpected character.")) }
 		};
 		self.add_token(token_type);
+		Ok(())
 	}
 
-	fn scan_string(&mut self) -> TokenType {
+	fn scan_string(&mut self) -> Result<TokenType,ScannerError> {
 		while !self.match_advance('"') {
-			if self.is_at_end() { self.report_error("Unterminated string."); return TokenType::Error }
+			if self.is_at_end() { return Err(self.report_error("Unterminated string.")) }
 			if self.peek() == '\n' { self.line += 1;  }
 			self.current += 1
 		}
 
-		TokenType::StringLit(self.source_string[self.start + 1..self.current - 1].to_string())
+		Ok(TokenType::StringLit(self.source_string[self.start + 1..self.current - 1].to_string()))
 	}
 
-	fn scan_word(&mut self) -> TokenType {
+	fn scan_word(&mut self) -> Result<TokenType,ScannerError> {
 		while !self.is_at_end() && (self.peek().is_alphanumeric() || self.peek() == '_') {
 			self.current += 1;
 		}
 		let substr = self.source_substr();
-		if KEYWORDS.contains(&&substr[..]) {
-			self.keyword_token(&substr)
+		Ok(if KEYWORDS.contains(&&substr[..]) {
+			self.keyword_token(&substr)?
 		} else {
 			TokenType::Identifier(substr)
-		}
+		})
 	}
 
-	fn scan_number(&mut self) -> TokenType {
+	fn scan_number(&mut self) -> Result<TokenType,ScannerError> {
 		while !self.is_at_end() && (self.peek().is_digit(10)) {
 			self.current += 1
 		}
 		if self.match_advance('.') {
-			if !self.peek().is_digit(10) { self.report_error("Number has trailing ."); return TokenType::Error }
+			if !self.peek().is_digit(10) { return Err(self.report_error("Number has trailing .")) }
 			while self.peek().is_digit(10) {
 				self.current += 1;
 			}
 		}
 		let n = self.source_substr().parse::<f64>().unwrap();
-		TokenType::Number(n)
+		Ok(TokenType::Number(n))
 	}
 
 	fn add_token(&mut self, ttype: TokenType) {
@@ -170,8 +165,8 @@ impl Scanner {
 		self.source_string[self.start..self.current].to_string()
 	}
 
-	fn keyword_token(&mut self, keyword: &str) -> TokenType {
-		match keyword {
+	fn keyword_token(&mut self, keyword: &str) -> Result<TokenType,ScannerError> {
+		Ok(match keyword {
 			"and" => TokenType::And,
 			"class" => TokenType::Class,
 			"elif" => TokenType::Elif,
@@ -191,7 +186,7 @@ impl Scanner {
 			"true" => TokenType::True,
 			"var" => TokenType::Var,
 			"while" => TokenType::While,
-			_ => { self.report_error("Invalid keyword!"); TokenType::Error }
-		}
+			_ => { return Err(self.report_error("Invalid keyword!")) }
+		})
 	}
 }

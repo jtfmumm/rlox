@@ -1,12 +1,16 @@
-use std::fmt;
+use crate::callable::Callable;
 
-#[derive(Debug, Clone, PartialEq)]
+use std::fmt;
+use std::rc::Rc;
+
+// #[derive(Debug, Clone, PartialEq)]
+#[derive(Debug)]
 pub enum Object {
 	Nil,
 	Str(String),
 	Num(f64),
 	Bool(bool),
-	// Variable { name: String },
+	Fun(Rc<dyn Callable>),
 }
 
 impl fmt::Display for Object {
@@ -17,7 +21,7 @@ impl fmt::Display for Object {
         	Str(s) => write!(f, "{}", s),
         	Num(n) => write!(f, "{}", n),
         	Bool(b) => write!(f, "{}", b),
-        	// Variable { name } => write!(f, "Var({})", name),
+        	Fun(fun) => write!(f, "{:?}", fun),
         }
     }
 }

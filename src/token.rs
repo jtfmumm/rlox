@@ -10,7 +10,6 @@ pub struct Token {
 
 impl Token {
 	pub fn new(ttype: TokenType, lexeme: String, literal: String, line: u32) -> Self {
-		// let literal = lit.to_string();
 		Token { ttype, lexeme, literal, line }
 	}
 }
@@ -18,7 +17,6 @@ impl Token {
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "{}", self.lexeme)
-		// write!(f, "Token({}, {}, {}, line: {})", self.ttype, self.lexeme, self.literal, self.line)
 	}
 }
 
@@ -42,9 +40,6 @@ pub enum TokenType {
 	Print, Return, Super, This, True, Var, While,
 
 	Eof, Sof,
-
-	// temporary error one,
-	Error,
 }
 
 impl fmt::Display for TokenType {

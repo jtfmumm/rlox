@@ -1,4 +1,4 @@
-use crate::cerror::EvalError;
+use crate::lox_error::EvalError;
 use crate::object::Object;
 use crate::token::{Token, TokenType};
 
@@ -8,7 +8,7 @@ use std::rc::Rc;
 
 pub struct Environment {
 	outer: Option<Rc<RefCell<Environment>>>,
-	env: HashMap<String, Object>
+	env: HashMap<String, Rc<Object>>
 }
 
 impl Environment {
@@ -16,7 +16,7 @@ impl Environment {
 		Environment { outer: None, env: HashMap::new() }
 	}
 
-	fn from_outer(outer: Rc<RefCell<Environment>>) -> Self {
+	pub fn from_outer(outer: Rc<RefCell<Environment>>) -> Self {
 		Environment { outer: Some(outer), env: HashMap::new() }
 	}
 
@@ -31,16 +31,11 @@ impl Environment {
 		}
 	}
 
-	pub fn declare(&mut self, id: Token, value: Object) -> Result<(), EvalError>  {
-		let name = match id.ttype {
-			TokenType::Identifier(name) => name.clone(),
-			_ => return Err(EvalError::new(&format!("Expect variable, got '{}'.", id.clone())))
-		};
-		self.env.insert(name, value);
-		Ok(())
+	pub fn declare(&mut self, name: &str, value: Rc<Object>)  {
+		self.env.insert(name.to_string(), value);
 	}
 
-	pub fn lookup(&self, id: Token) -> Result<Object, EvalError> {
+	pub fn lookup(&self, id: Token) -> Result<Rc<Object>, EvalError> {
 		let name = match id.ttype {
 			TokenType::Identifier(ref name) => name.clone(),
 			_ => return Err(EvalError::new_with_context(id.clone(), &id.to_string(), "Expect variable."))
@@ -55,13 +50,11 @@ impl Environment {
 				None => Err(
 					EvalError::new(&format!("Undefined variable '{}'.", name.to_string()))
 						.with_context(id.clone(), &id.to_string()))
-
-				// None => Err(EvalError::new_with_context(id.clone(), &id.to_string(), "Undefined variable."))
 			}
 		}
 	}
 
-	pub fn assign(&mut self, id: Token, value: Object) -> Result<(), EvalError> {
+	pub fn assign(&mut self, id: Token, value: Rc<Object>) -> Result<(), EvalError> {
 		let name = match id.ttype {
 			TokenType::Identifier(ref name) => name.clone(),
 			_ => return Err(EvalError::new_with_context(id.clone(), &id.to_string(), "Expect variable."))
@@ -79,7 +72,6 @@ impl Environment {
 				None => Err(
 					EvalError::new(&format!("Undefined variable '{}'.", name.to_string()))
 						.with_context(id.clone(), &id.to_string()))
-				// None => Err(EvalError::new_with_context(id.clone(), &id.to_string(), "Undefined variable."))
 			}
 		}
 	}

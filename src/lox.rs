@@ -1,4 +1,4 @@
-use crate::cerror::LoxError;
+use crate::lox_error::LoxError;
 use crate::interpreter::Interpreter;
 use crate::parser::Parser;
 use crate::scanner::Scanner;
@@ -14,8 +14,6 @@ const RUNTIME_ERROR_CODE: i32 = 70;
 
 pub struct Lox {
 	interpreter: Interpreter,
-	// had_error: bool,
-	// had_runtime_error: bool,
 }
 
 impl Lox {

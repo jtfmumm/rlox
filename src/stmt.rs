@@ -4,6 +4,7 @@
 ///////////////////////
 
 use crate::expr::Expr;
+use crate::token::Token;
 
 use std::fmt;
 use std::rc::Rc;
@@ -13,6 +14,7 @@ pub enum Stmt {
 	BlockStmt { stmts: Rc<Vec<Rc<Stmt>>> },
 	ExprStmt { expr: Rc<Expr> },
 	ForStmt { init: Rc<Option<Rc<Stmt>>>, condition: Rc<Option<Rc<Expr>>>, inc: Rc<Option<Rc<Expr>>>, block: Rc<Stmt> },
+	FunStmt { name: Token, params: Rc<Vec<Token>>, body: Rc<Stmt> },
 	IfStmt { conditionals: Rc<Vec<(Rc<Expr>,Rc<Stmt>)>>, else_block: Rc<Option<Rc<Stmt>>> },
 	PrintStmt { expr: Rc<Expr> },
 	VarDeclStmt { variable: Rc<Expr>, value: Rc<Expr> },
@@ -30,6 +32,10 @@ impl Stmt {
 
 	pub fn for_stmt(init: Rc<Option<Rc<Stmt>>>, condition: Rc<Option<Rc<Expr>>>, inc: Rc<Option<Rc<Expr>>>, block: Rc<Stmt>) -> Rc<Stmt> {
 		Rc::new(Stmt::ForStmt { init, condition, inc, block })
+	}
+
+	pub fn fun_stmt(name: Token, params: Rc<Vec<Token>>, body: Rc<Stmt>) -> Rc<Stmt> {
+		Rc::new(Stmt::FunStmt { name, params, body })
 	}
 
 	pub fn if_stmt(conditionals: Rc<Vec<(Rc<Expr>,Rc<Stmt>)>>, else_block: Rc<Option<Rc<Stmt>>>) -> Rc<Stmt> {
