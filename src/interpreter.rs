@@ -74,7 +74,7 @@ impl Interpreter {
 								println!("val: {}", stringify_cli_result(&obj));
 							}
 						},
-						Err(EvalError::Return) => return Err(EvalError::Return),
+						Err(EvalError::Return(obj)) => return Err(EvalError::Return(obj)),
 						Err(err) => {
 							err.report();
 							last_error = Some(err);
@@ -103,7 +103,8 @@ impl Interpreter {
 				Ok(Rc::new(Object::Nil))
 			},
 			FunStmt { name, params, body } => {
-				let f = Rc::new(Function::new(name.clone(), params.clone(), body.clone()));
+				let f = Rc::new(Function::new(name.clone(), params.clone(),
+					   						  body.clone(), self.local_env.clone()));
 				let fobj = Rc::new(Object::Fun(f));
 				match name.ttype.clone() {
 					TokenType::Identifier(name) => {
@@ -132,11 +133,12 @@ impl Interpreter {
 				Ok(Rc::new(Object::Nil))
 			},
 			ReturnStmt { expr } => {
-				let res = self.evaluate(&expr)?;
-				match &*res.clone() {
-					Object::Nil => Err(EvalError::Return),
-					_ => Ok(res)
-				}
+				Err(EvalError::new_return(self.evaluate(&expr)?))
+				// let res = self.evaluate(&expr)?;
+				// match &*res.clone() {
+				// 	Object::Nil => Err(EvalError::Return),
+				// 	_ => Ok(res)
+				// }
 			},
 			VarDeclStmt { variable, value } => {
 				match &*variable.clone() {

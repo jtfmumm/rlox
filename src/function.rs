@@ -14,11 +14,13 @@ pub struct Function {
 	name: Token,
 	params: Rc<Vec<Token>>,
 	body: Rc<Stmt>,
+	closure: Rc<RefCell<Environment>>
 }
 
 impl Function {
-	pub fn new(name: Token, params: Rc<Vec<Token>>, body: Rc<Stmt>) -> Self {
-		Function { name, params, body }
+	pub fn new(name: Token, params: Rc<Vec<Token>>,
+		       body: Rc<Stmt>, closure: Rc<RefCell<Environment>>) -> Self {
+		Function { name, params, body, closure }
 	}
 }
 
@@ -27,7 +29,7 @@ impl Callable for Function {
 
 	fn call(&self, interpreter: &mut Interpreter,
 		    args: &Vec<Rc<Object>>) -> Result<Rc<Object>,EvalError> {
-		let scope = Rc::new(RefCell::new(Environment::new()));
+		let scope = Rc::new(RefCell::new(Environment::from_outer(self.closure.clone())));
 		// This should be enforced before call() is called
 		debug_assert!(self.params.len() == args.len());
 		self.params.iter()
@@ -41,9 +43,13 @@ impl Callable for Function {
 		match interpreter.execute_with_env(self.body.clone(), scope.clone()) {
 			Ok(obj) => Ok(obj),
 			Err(EvalError::Fail(msg)) => Err(EvalError::new(&msg)),
-			Err(EvalError::Return) => Ok(Rc::new(Object::Nil)),
+			Err(EvalError::Return(obj)) => Ok(obj),
 		}
 		// Ok(Rc::new(Object::Nil))
+	}
+
+	fn debug(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
+    	write!(f, "{}", &format!("<fn {}>", self.name))
 	}
 }
 

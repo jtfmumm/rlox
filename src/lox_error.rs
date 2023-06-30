@@ -1,7 +1,9 @@
+use crate::object::Object;
 use crate::token::{Token, TokenType};
 
 use std::error::Error;
 use std::fmt;
+use std::rc::Rc;
 
 pub enum LoxError {
 	Parse,
@@ -75,9 +77,9 @@ impl fmt::Display for ParseError {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub enum EvalError {
-	Return,
+	Return(Rc<Object>),
 	Fail(String)
 }
 
@@ -92,9 +94,13 @@ impl EvalError {
 		EvalError::Fail(msg)
 	}
 
+	pub fn new_return(obj: Rc<Object>) -> Self {
+		EvalError::Return(obj)
+	}
+
 	pub fn with_context(self, token: Token, expr_str: &str) -> Self {
 		match self {
-			EvalError::Return => self,
+			EvalError::Return(_) => self,
 			EvalError::Fail(old_msg) => {
 				let location = expr_str.to_string();
 				let msg = old_msg.clone() + &format!("\n[line {}] Error at {}", token.line, location);
@@ -105,7 +111,7 @@ impl EvalError {
 
 	pub fn report(&self) {
 		match self {
-			EvalError::Return => {},
+			EvalError::Return(_) => {},
 			EvalError::Fail(msg) => {
 				eprintln!("{}\n", msg);
 			}
@@ -118,7 +124,7 @@ impl Error for EvalError {}
 impl fmt::Display for EvalError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
-			EvalError::Return => write!(f, "{}", "Return"),
+			EvalError::Return(obj) => write!(f, "Return {}", obj),
 			EvalError::Fail(msg) => write!(f, "{}", msg),
 		}
     }
