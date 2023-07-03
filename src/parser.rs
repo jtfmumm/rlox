@@ -6,8 +6,11 @@ use crate::token::{Token, TokenType};
 
 use std::collections::HashMap;
 use std::iter::Peekable;
+use std::ops::Not;
 use std::rc::Rc;
 use std::vec::IntoIter;
+
+use unicode_segmentation::UnicodeSegmentation;
 
 pub struct Parser {
 	tokens: Peekable<IntoIter<Token>>,
@@ -74,7 +77,6 @@ impl Parser {
 	}
 
 	fn block(&mut self) -> Result<Rc<Stmt>, ParseError> {
-		// println!("!@ ->->->->-> Adding block scope {:?}", self.scopes.len() + 1);
 		self.scopes.push(HashMap::new());
 		let mut stmts = Vec::new();
 		let mut failed = false;
@@ -93,13 +95,11 @@ impl Parser {
 				if self.check(&[TokenType::Eof]) {
 					break
 				}
-				// if self.tokens.peek().is_none() || self.check(&[TokenType::Eof])  { break }
 			}
 		} else {
 			stmts.push(self.statement()?)
 		}
 
-		// println!("!@ <=<=<=<= Removing block scope {:?}", self.scopes.len()  - 1);
 		self.scopes.pop();
 
 		if failed {
@@ -110,6 +110,7 @@ impl Parser {
 	}
 
 	fn for_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
+		self.scopes.push(HashMap::new());
 		self.consume(TokenType::LeftParen, "Expect ( for condition.")?;
 		let init = if self.match_advance(&[TokenType::Semicolon]) {
 			None
@@ -122,9 +123,6 @@ impl Parser {
 		let condition = if self.match_advance(&[TokenType::Semicolon]) {
 			None
 		} else {
-			if !self.check_identifier() {
-				return Err(perror(self.peek()?.clone(), "Expect expression."))
-			}
 			let exp = Some(self.expression()?);
 			self.consume(TokenType::Semicolon, "Expect ; after for condition.")?;
 			exp
@@ -140,6 +138,7 @@ impl Parser {
 			expr
 		};
 		let blk = self.block()?;
+		self.scopes.pop();
 		Ok(Stmt::for_stmt(Rc::new(init), Rc::new(condition), Rc::new(inc), blk))
 	}
 
@@ -150,8 +149,7 @@ impl Parser {
 			return Err(perror(self.peek()?.clone(), "Expect function name."))
 		};
 		self.define_var(&name)?;
-		self.consume(TokenType::LeftParen, "Expect '(' after function name.");
-		// println!("!@ ->->->->-> Adding fun scope {:?}", self.scopes.len() + 1);
+		self.consume(TokenType::LeftParen, "Expect '(' after function name.")?;
 		self.scopes.push(HashMap::new());
 		let mut params = Vec::new();
 		if !self.check(&[TokenType::RightParen]) {
@@ -174,13 +172,11 @@ impl Parser {
 				return Err(perror(self.peek_prev().clone(), "Can't have more than 255 parameters."))
 			}
 		}
-		self.consume(TokenType::RightParen, "Expect ')' after parameters.");
-		// self.consume(TokenType::LeftBrace, "Expect '{' before function body.");
+		self.consume(TokenType::RightParen, "Expect ')' after parameters.")?;
 		if !self.check(&[TokenType::LeftBrace]) {
 			return Err(perror(self.peek()?.clone(), "Expect '{' before function body."))
 		}
 		let body = self.block()?;
-		// println!("!@ <=<=<=<= Removing fun scope {:?}", self.scopes.len() - 1);
 		self.scopes.pop();
 		let fun_depth = Rc::new(if self.scopes.is_empty() {
 			None
@@ -254,6 +250,9 @@ impl Parser {
 	}
 
 	fn return_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
+		if self.scopes.is_empty() {
+			return Err(perror(self.peek_prev().clone(), "Can't return from top-level code."))
+		}
 		if self.match_advance(&[TokenType::Semicolon]) {
 			return Ok(Stmt::return_stmt(Expr::literal(Rc::new(Object::Nil))))
 		}
@@ -315,17 +314,6 @@ impl Parser {
 			false
 		}
 	}
-
-	// fn peek_identifier(&mut self) -> Result<Token, ParseError> {
-	// 	if let Some(t) = self.tokens.peek() {
-	// 		match t.ttype {
-	// 			TokenType::Identifier(name) => Ok(name.clone()),
-	// 		    _ => Err(perror(self.peek()?.clone(), "Expect identifier."))
-	// 		}
-	// 	} else {
-	// 		Err(perror(self.peek()?.clone(), "Expect identifier."))
-	// 	}
-	// }
 
 	fn consume(&mut self, t: TokenType, msg: &str) -> Result<(), ParseError> {
 		if self.check(&[t]) {
@@ -466,11 +454,6 @@ impl Parser {
 		let mut args = Vec::new();
 		loop {
 			args.push(self.expression()?);
-			// if self.check_identifier() {
-			// 	args.push(self.expression()?);
-			// } else {
-			// 	return Err(perror(self.peek_prev().clone(), "Expect variable."))
-			// }
 			if !self.match_advance(&[TokenType::Comma]) { break }
 		}
 		if args.len() >= 255 {
@@ -502,9 +485,8 @@ impl Parser {
 				self.consume(TokenType::RightParen, "Expect )!")?;
 				Ok(Expr::grouping(expr))
 			},
-			Identifier(vname) => {
+			Identifier(_) => {
 				let depth = self.depth_for(&token)?;
-				// println!("!@ Setting var depth {:?}:{:?}", token, depth);
 				Ok(Expr::variable(token.clone().clone(), depth))
 			},
 			_ => {
@@ -514,12 +496,10 @@ impl Parser {
 	}
 
 	fn declare_var(&mut self, name: &Token) -> Result<(), ParseError> {
-		// println!("!@ declare_var {:?} with {:?} scopes", name, self.scopes.len());
 		self.set_var(name, false)
 	}
 
 	fn define_var(&mut self, name: &Token) -> Result<(), ParseError> {
-		// println!("!@ define_var {:?} with {:?} scopes", name, self.scopes.len());
 		self.set_var(name, true)
 	}
 
@@ -542,15 +522,9 @@ impl Parser {
 		if self.scopes.is_empty() { return Ok(()) }
 		if let TokenType::Identifier(ref vname) = name.ttype {
 			let scope = self.scopes.last_mut().unwrap();
-			if scope.contains_key(vname) {
-				if !define {
-					return Err(perror(name.clone(),
-						"Already a variable with this name in this scope."))
-				} else if *(scope.get(vname).unwrap()) {
-					// println!("!@COOL");
-					// return Err(perror(name.clone(),
-						// "Can't read local variable in its own initializer."))
-				}
+			if !define && scope.contains_key(vname) {
+				return Err(perror(name.clone(),
+					"Already a variable with this name in this scope."))
 			}
 			scope.insert(vname.to_string(), define);
 			Ok(())
@@ -560,13 +534,8 @@ impl Parser {
 	}
 
 	fn depth_for(&self, identifier: &Token) -> Result<Rc<Option<u32>>, ParseError> {
-		// println!("!@ depth_for {:?}, scopes {:?}", identifier, self.scopes.len());
 		if let TokenType::Identifier(vname) = identifier.clone().ttype {
 			for i in (0..self.scopes.len()).rev() {
-				//!@
-				// if identifier.lexeme == "local" {
-				// 	println!("-- i: {:?}", i);
-				// }
 				if self.scopes.get(i).unwrap().contains_key(&vname) {
 					let depth = (self.scopes.len() - 1) - i;
 					return Ok(Rc::new(Some(depth as u32)))

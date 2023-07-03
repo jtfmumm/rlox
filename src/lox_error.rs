@@ -25,7 +25,6 @@ pub fn perror(token: Token, msg: &str) -> ParseError {
 
 pub fn preport(line_n: u32, location: &str, msg: &str) {
 	eprintln!("[line {}] Error {}: {}\n", line_n, location, msg);
-	// eprintln!("\x1b[1;31m[{}] Error\x1b[0m{}: {}", line_n, location, msg);
 }
 
 

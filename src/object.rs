@@ -3,7 +3,6 @@ use crate::callable::Callable;
 use std::fmt;
 use std::rc::Rc;
 
-// #[derive(Debug, Clone, PartialEq)]
 #[derive(Debug)]
 pub enum Object {
 	Nil,

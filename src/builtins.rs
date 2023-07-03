@@ -12,8 +12,8 @@ pub struct ClockFn {}
 impl Callable for ClockFn {
 	fn arity(&self) -> usize { 0 }
 
-	fn call(&self, interpreter: &mut Interpreter,
-		    args: &Vec<Rc<Object>>) -> Result<Rc<Object>,EvalError> {
+	fn call(&self, _interpreter: &mut Interpreter,
+		    _args: &Vec<Rc<Object>>) -> Result<Rc<Object>,EvalError> {
 	    Ok(Rc::new(
 	    	Object::Num(
 		    	SystemTime::now()
@@ -29,7 +29,7 @@ pub struct StrFn {}
 impl Callable for StrFn {
 	fn arity(&self) -> usize { 1 }
 
-	fn call(&self, interpreter: &mut Interpreter,
+	fn call(&self, _interpreter: &mut Interpreter,
 		    args: &Vec<Rc<Object>>) -> Result<Rc<Object>,EvalError> {
 	    let arg = &args[0];
 	    let res = format!("{}", arg);

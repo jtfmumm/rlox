@@ -31,7 +31,6 @@ impl Callable for Function {
 	fn call(&self, interpreter: &mut Interpreter,
 		    args: &Vec<Rc<Object>>) -> Result<Rc<Object>,EvalError> {
 		let scope = Rc::new(RefCell::new(Environment::from_outer(self.closure.clone())));
-		// This should be enforced before call() is called
 		debug_assert!(self.params.len() == args.len());
 		self.params.iter()
 			.zip(args)

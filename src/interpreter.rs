@@ -109,10 +109,8 @@ impl Interpreter {
 				match name.ttype.clone() {
 					TokenType::Identifier(name) => {
 						if depth.is_some() {
-							// println!("!@Declare LOCAL {:?}", name);
 							self.local_env.borrow_mut().declare(&name, fobj.clone());
 						} else {
-							// println!("!@Declare GLOBAL {:?}", name);
 							self.global_env.borrow_mut().declare(&name, fobj.clone());
 						}
 					},
@@ -140,11 +138,6 @@ impl Interpreter {
 			},
 			ReturnStmt { expr } => {
 				Err(EvalError::new_return(self.evaluate(&expr)?))
-				// let res = self.evaluate(&expr)?;
-				// match &*res.clone() {
-				// 	Object::Nil => Err(EvalError::Return),
-				// 	_ => Ok(res)
-				// }
 			},
 			VarDeclStmt { variable, value } => {
 				match &*variable.clone() {
@@ -153,10 +146,8 @@ impl Interpreter {
 						match name.ttype {
 							TokenType::Identifier(ref nm) => {
 								if depth.is_some() {
-									// println!("!@Declare LOCAL {:?}, d:{:?}", name, depth);
 									self.local_env.borrow_mut().declare(nm, val.clone());
 								} else {
-									// println!("!@Declare GLOBAL {:?}, d:{:?}", name, depth);
 									self.global_env.borrow_mut().declare(nm, val.clone());
 								}
 							},
@@ -185,10 +176,8 @@ impl Interpreter {
 					Expr::Variable { name, depth } => {
 						let val = self.evaluate(&value)?;
 						if depth.is_some() {
-							// println!("!@Assign LOCAL {:?}, d:{:?}", name, depth);
 							self.local_env.borrow_mut().assign(name.clone(), val.clone())?;
 						} else {
-							// println!("!@Assign GLOBAL {:?}, d:{:?}", name, depth);
 							self.global_env.borrow_mut().assign(name.clone(), val.clone())?;
 						}
 						Ok(val)
@@ -232,10 +221,8 @@ impl Interpreter {
 			},
 			Variable { ref name, ref depth } => {
 				Ok(if let Some(d) = &*depth.clone() {
-					// println!("!@Var LOCAL {:?}, d:{:?}", name, depth);
 					self.local_env.borrow_mut().lookup(name.clone(), *d)?
 				} else {
-					// println!("!@Var GLOBAL {:?}, d:{:?}", name, depth);
 					self.global_env.borrow_mut().lookup(name.clone(), 0)?
 				})
 			},
@@ -261,8 +248,6 @@ impl Interpreter {
 			},
 			_ => Err(EvalError::new("Can only call functions and classes.")
 					.with_context(paren.clone(), &callee.to_string()))
-			// _ => Err(EvalError::new_with_context(paren.clone(), &callee.to_string(),
-				// "Can only call functions and classes."))
 		}
 	}
 
@@ -364,14 +349,6 @@ fn is_equal(l: Rc<Object>, r: Rc<Object>) -> bool {
 		_ => false,
  	}
 }
-
-// fn as_bool(obj: Object) -> Result<bool, EvalError> {
-// 	use self::Object::*;
-// 	match obj {
-// 		Bool(b) => Ok(b),
-// 		_ => Err(EvalError::new("Operands must be Booleans"))
-// 	}
-// }
 
 fn as_num(obj: Rc<Object>) -> Result<f64, EvalError> {
 	use self::Object::*;

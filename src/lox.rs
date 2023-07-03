@@ -28,7 +28,7 @@ impl Lox {
 	        .expect("Should have been able to read the file");
 
 		match self.run(contents) {
-			Ok(obj) => {},
+			Ok(_) => {},
 			Err(err) => {
 				match err {
 					LoxError::Parse => process::exit(COMPILE_ERROR_CODE),
@@ -61,9 +61,6 @@ impl Lox {
 	fn run(&mut self, source: String) -> Result<Rc<Object>,LoxError> {
 		let mut scanner = Scanner::new(source);
 		let tokens = scanner.scan_tokens()?;
-		// for t in &tokens {
-		// 	println!("{:?}", t);
-		// }
 		let mut parser = Parser::new(tokens);
 		let stmts = parser.parse()?;
 		self.interpreter.interpret(stmts)
