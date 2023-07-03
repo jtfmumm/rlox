@@ -6,11 +6,8 @@ use crate::token::{Token, TokenType};
 
 use std::collections::HashMap;
 use std::iter::Peekable;
-use std::ops::Not;
 use std::rc::Rc;
 use std::vec::IntoIter;
-
-use unicode_segmentation::UnicodeSegmentation;
 
 pub struct Parser {
 	tokens: Peekable<IntoIter<Token>>,
@@ -471,24 +468,23 @@ impl Parser {
 		let token = &self.advance()?.clone();
 		match &token.ttype {
 			False => Ok(Expr::literal(Rc::new(Object::Bool(false)))),
-			True => Ok(Expr::literal(Rc::new(Object::Bool(true)))),
-			Nil => Ok(Expr::literal(Rc::new(Object::Nil))),
-			Number(n) => Ok(Expr::literal(Rc::new(Object::Num(*n)))),
-			StringLit(_) => {
-				let s = self.peek_prev().literal.clone();
-				// TODO: This doesn't handle unicode correctly.
-				let s2 = s[1..s.len() - 1].to_string();
-				Ok(Expr::literal(Rc::new(Object::Str(s2))))
+			Identifier(_) => {
+				let depth = self.depth_for(&token)?;
+				Ok(Expr::variable(token.clone().clone(), depth))
 			},
 			LeftParen => {
 				let expr = self.expression()?;
 				self.consume(TokenType::RightParen, "Expect )!")?;
 				Ok(Expr::grouping(expr))
 			},
-			Identifier(_) => {
-				let depth = self.depth_for(&token)?;
-				Ok(Expr::variable(token.clone().clone(), depth))
+			Nil => Ok(Expr::literal(Rc::new(Object::Nil))),
+			Number(n) => Ok(Expr::literal(Rc::new(Object::Num(*n)))),
+			StringLit(_) => {
+				let s = self.peek_prev().literal.clone();
+				let s2 = s[1..s.len() - 1].to_string();
+				Ok(Expr::literal(Rc::new(Object::Str(s2))))
 			},
+			True => Ok(Expr::literal(Rc::new(Object::Bool(true)))),
 			_ => {
 				Err(perror(self.peek_prev().clone(), "Expect expression."))
 			}
@@ -501,21 +497,6 @@ impl Parser {
 
 	fn define_var(&mut self, name: &Token) -> Result<(), ParseError> {
 		self.set_var(name, true)
-	}
-
-	fn assign_var(&mut self, name: &Token) -> Result<(), ParseError> {
-		if self.scopes.is_empty() { return Ok(()) }
-		if let TokenType::Identifier(vname) = name.clone().ttype {
-			for i in (0..self.scopes.len()).rev() {
-				let scope = self.scopes.get_mut(i).unwrap();
-				if scope.contains_key(&vname) {
-					scope.insert(vname.to_string(), true);
-				}
-			}
-			Ok(())
-		} else {
-			Err(perror(self.peek_prev().clone(), "Expect identifier."))
-		}
 	}
 
 	fn set_var(&mut self, name: &Token, define: bool) -> Result<(), ParseError> {
@@ -533,10 +514,25 @@ impl Parser {
 		}
 	}
 
-	fn depth_for(&self, identifier: &Token) -> Result<Rc<Option<u32>>, ParseError> {
-		if let TokenType::Identifier(vname) = identifier.clone().ttype {
+	fn assign_var(&mut self, name: &Token) -> Result<(), ParseError> {
+		if self.scopes.is_empty() { return Ok(()) }
+		if let TokenType::Identifier(ref vname) = name.ttype {
 			for i in (0..self.scopes.len()).rev() {
-				if self.scopes.get(i).unwrap().contains_key(&vname) {
+				let scope = self.scopes.get_mut(i).unwrap();
+				if scope.contains_key(vname) {
+					scope.insert(vname.to_string(), true);
+				}
+			}
+			Ok(())
+		} else {
+			Err(perror(self.peek_prev().clone(), "Expect variable."))
+		}
+	}
+
+	fn depth_for(&self, identifier: &Token) -> Result<Rc<Option<u32>>, ParseError> {
+		if let TokenType::Identifier(ref vname) = identifier.ttype {
+			for i in (0..self.scopes.len()).rev() {
+				if self.scopes.get(i).unwrap().contains_key(vname) {
 					let depth = (self.scopes.len() - 1) - i;
 					return Ok(Rc::new(Some(depth as u32)))
 				}

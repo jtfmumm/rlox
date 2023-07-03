@@ -39,8 +39,8 @@ impl Lox {
 		}
 	}
 
-	pub fn run_prompt(&mut self) -> io::Result<()> {
-	    let exit_string = "x\n".to_string();
+	pub fn run_repl(&mut self) -> io::Result<()> {
+	    let exit_string = "exit()\n".to_string();
 	    self.interpreter.repl();
 		loop {
 			print!("> ");

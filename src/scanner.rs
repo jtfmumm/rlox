@@ -3,8 +3,8 @@ use crate::token::{Token, TokenType};
 
 use std::mem;
 
-const KEYWORDS: [&'static str; 18] = ["and", "class", "elif", "else", "false", "fun", "for",
-							 "if", "nil", "or", "p", "print", "return", "super", "this",
+const KEYWORDS: [&'static str; 17] = ["and", "class", "elif", "else", "false", "fun", "for",
+							 "if", "nil", "or", "print", "return", "super", "this",
 							 "true", "var", "while"];
 
 pub struct Scanner {
@@ -13,7 +13,6 @@ pub struct Scanner {
 	tokens: Vec<Token>,
 	start: usize,
 	current: usize,
-	last: char,
 	line: u32,
 }
 
@@ -22,9 +21,8 @@ impl Scanner {
 		let source = s.chars().collect();
 		let start = 0;
 		let current = 0;
-		let last = ' ';
 		let line = 1;
-		Scanner { source_string: s, source, tokens: Vec::new(), start, current, last, line }
+		Scanner { source_string: s, source, tokens: Vec::new(), start, current, line }
 	}
 
 	pub fn scan_tokens(&mut self) -> Result<Vec<Token>,LoxError> {
@@ -44,7 +42,6 @@ impl Scanner {
 	fn advance(&mut self) -> char {
 		let ch = self.source[self.current];
 		self.current += 1;
-		self.last = ch;
 		ch
 	}
 
@@ -68,12 +65,6 @@ impl Scanner {
 
 	fn report_error(&mut self, msg: &str) -> ScannerError {
 		scerror(self.line, msg)
-		// if self.is_at_end() {
-		// 	scerror(self.line, "end", msg)
-		// } else {
-		// 	let location = &format!("'{}'", self.peek_next().to_string());
-		// 	scerror(self.line, location, msg)
-		// }
 	}
 
 	fn scan_token(&mut self) -> Result<(),ScannerError> {
@@ -133,6 +124,7 @@ impl Scanner {
 		while !self.match_advance('"') {
 			if self.is_at_end() { return Err(self.report_error("Unterminated string.")) }
 			if self.peek() == '\n' { self.line += 1;  }
+			// TODO: This doesn't handle unicode correctly.
 			self.current += 1;
 		}
 		let s_raw = &self.source_string[self.start + 1..self.current - 1];
@@ -186,8 +178,6 @@ impl Scanner {
 			"if" => TokenType::If,
 			"nil" => TokenType::Nil,
 			"or" => TokenType::Or,
-			// Save myself repl typing by adding a shortened print
-			"p" => TokenType::Print,
 			"print" => TokenType::Print,
 			"return" => TokenType::Return,
 			"super" => TokenType::Super,

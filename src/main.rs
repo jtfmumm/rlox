@@ -26,9 +26,9 @@ fn main() {
   } else if args.len() == 2 {
   	lox.run_file(&args[1]);
   } else {
-  	match lox.run_prompt() {
-  		Ok(_) => println!("Tot ziens"),
-  		Err(_) => eprintln!("Something went wrong!")
-  	}
+  	match lox.run_repl() {
+      Ok(()) => {},
+      Err(err) => println!("Exited with error: {}", err)
+    };
   }
 }
