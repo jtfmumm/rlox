@@ -1,0 +1,12 @@
+var a = 1;
+
+fun f() {
+	fun g() {
+		return a;
+	}
+
+	var a = 2;
+	return g();
+}
+
+print f();

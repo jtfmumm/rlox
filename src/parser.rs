@@ -4,6 +4,7 @@ use crate::object::Object;
 use crate::stmt::Stmt;
 use crate::token::{Token, TokenType};
 
+use std::collections::HashMap;
 use std::iter::Peekable;
 use std::rc::Rc;
 use std::vec::IntoIter;
@@ -11,12 +12,15 @@ use std::vec::IntoIter;
 pub struct Parser {
 	tokens: Peekable<IntoIter<Token>>,
 	prev: Token,
+	// This represents all scopes except the global scope.
+	scopes: Vec<HashMap<String, bool>>,
 }
 
 impl Parser {
 	pub fn new(tokens: Vec<Token>) -> Self {
 		let prev = Token::new(TokenType::Sof, "".to_string(), "".to_string(), 0);
-		Parser { tokens: tokens.into_iter().peekable(), prev }
+		Parser { tokens: tokens.into_iter().peekable(), prev,
+				 scopes: Vec::new() }
 	}
 
 	pub fn parse(&mut self) -> Result<Vec<Rc<Stmt>>, LoxError> {
@@ -70,6 +74,8 @@ impl Parser {
 	}
 
 	fn block(&mut self) -> Result<Rc<Stmt>, ParseError> {
+		// println!("!@ ->->->->-> Adding block scope {:?}", self.scopes.len() + 1);
+		self.scopes.push(HashMap::new());
 		let mut stmts = Vec::new();
 		let mut failed = false;
 
@@ -84,13 +90,20 @@ impl Parser {
 						let _ = self.synchronize();
 					}
 				}
+				if self.check(&[TokenType::Eof]) {
+					break
+				}
+				// if self.tokens.peek().is_none() || self.check(&[TokenType::Eof])  { break }
 			}
 		} else {
 			stmts.push(self.statement()?)
 		}
 
+		// println!("!@ <=<=<=<= Removing block scope {:?}", self.scopes.len()  - 1);
+		self.scopes.pop();
+
 		if failed {
-			Err(perror(self.peek_prev().clone(), "Error while parsing block."))
+			Err(ParseError::new("Failed while parsing block."))
 		} else {
 			Ok(Stmt::block_stmt(Rc::new(stmts)))
 		}
@@ -136,13 +149,20 @@ impl Parser {
 		} else {
 			return Err(perror(self.peek()?.clone(), "Expect function name."))
 		};
+		self.define_var(&name)?;
 		self.consume(TokenType::LeftParen, "Expect '(' after function name.");
+		// println!("!@ ->->->->-> Adding fun scope {:?}", self.scopes.len() + 1);
+		self.scopes.push(HashMap::new());
 		let mut params = Vec::new();
 		if !self.check(&[TokenType::RightParen]) {
 			loop {
 				if self.check_identifier() {
 					match &*self.expression()?.clone() {
-						Expr::Variable { name } => params.push(name.clone()),
+						Expr::Variable { name, .. } => {
+							self.declare_var(&name)?;
+							self.define_var(&name)?;
+							params.push(name.clone());
+						},
 						_ => unreachable!()
 					}
 				} else {
@@ -160,17 +180,37 @@ impl Parser {
 			return Err(perror(self.peek()?.clone(), "Expect '{' before function body."))
 		}
 		let body = self.block()?;
-		Ok(Stmt::fun_stmt(name.clone(), Rc::new(params), body.clone()))
+		// println!("!@ <=<=<=<= Removing fun scope {:?}", self.scopes.len() - 1);
+		self.scopes.pop();
+		let fun_depth = Rc::new(if self.scopes.is_empty() {
+			None
+		} else {
+			Some(0)
+		});
+		Ok(Stmt::fun_stmt(name.clone(), Rc::new(params), body.clone(), fun_depth))
 	}
 
 	fn var_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
 		if self.check_identifier() {
+			let vname = self.peek()?.clone();
+			self.declare_var(&vname)?;
 			let (vr, vl) = match &*self.expression()?.clone() {
 				Expr::Assign { variable, value } => {
+					if let Expr::Variable { name, .. } = &*value.clone() {
+						if &vname == name && self.depth_for(&vname)?.is_some() {
+							return Err(perror(self.peek_prev().clone(),
+								"Can't read local variable in its own initializer."));
+						}
+					}
+					self.define_var(&vname)?;
 					(variable.clone(), value.clone())
 				},
-				Expr::Variable { name } => {
-					(Expr::variable(name.clone()), Expr::literal(Rc::new(Object::Nil)))
+				Expr::Variable { name, depth } => {
+					self.define_var(&name)?;
+					(
+						Expr::variable(name.clone(), depth.clone()),
+					 	Expr::literal(Rc::new(Object::Nil))
+				 	)
 				}
 				_ => return Err(perror(self.peek_prev().clone(), "Invalid declaration"))
 			};
@@ -276,6 +316,17 @@ impl Parser {
 		}
 	}
 
+	// fn peek_identifier(&mut self) -> Result<Token, ParseError> {
+	// 	if let Some(t) = self.tokens.peek() {
+	// 		match t.ttype {
+	// 			TokenType::Identifier(name) => Ok(name.clone()),
+	// 		    _ => Err(perror(self.peek()?.clone(), "Expect identifier."))
+	// 		}
+	// 	} else {
+	// 		Err(perror(self.peek()?.clone(), "Expect identifier."))
+	// 	}
+	// }
+
 	fn consume(&mut self, t: TokenType, msg: &str) -> Result<(), ParseError> {
 		if self.check(&[t]) {
 			self.advance()?;
@@ -290,7 +341,6 @@ impl Parser {
 	}
 
 	fn expression(&mut self) -> Result<Rc<Expr>, ParseError> {
-		// TODO: Add assignment and remove it from the statement side of things.
 		Ok(self.logic_or()?)
 	}
 
@@ -320,10 +370,11 @@ impl Parser {
 		let mut expr = self.equality()?;
 
 		if self.match_advance(&[TokenType::Equal]) {
-			match &*expr.clone() {
-				Expr::Variable { .. } => {},
+			let vname = match &*expr.clone() {
+				Expr::Variable { name, .. } => name.clone(),
 				_ => return Err(perror(self.peek_prev().clone(), "Invalid assignment target."))
-			}
+			};
+			self.assign_var(&vname)?;
 			let value = self.expression()?;
 			expr = Expr::assign(expr, value)
 		}
@@ -434,7 +485,7 @@ impl Parser {
 		if self.check(&[TokenType::Semicolon]) {
 			return Err(perror(self.peek()?.clone(), "Expect expression."))
 		}
-		let token = &self.advance()?;
+		let token = &self.advance()?.clone();
 		match &token.ttype {
 			False => Ok(Expr::literal(Rc::new(Object::Bool(false)))),
 			True => Ok(Expr::literal(Rc::new(Object::Bool(true)))),
@@ -451,19 +502,98 @@ impl Parser {
 				self.consume(TokenType::RightParen, "Expect )!")?;
 				Ok(Expr::grouping(expr))
 			},
-			Identifier(_) => Ok(Expr::variable(token.clone().clone())),
+			Identifier(vname) => {
+				let depth = self.depth_for(&token)?;
+				// println!("!@ Setting var depth {:?}:{:?}", token, depth);
+				Ok(Expr::variable(token.clone().clone(), depth))
+			},
 			_ => {
 				Err(perror(self.peek_prev().clone(), "Expect expression."))
 			}
 		}
 	}
 
+	fn declare_var(&mut self, name: &Token) -> Result<(), ParseError> {
+		// println!("!@ declare_var {:?} with {:?} scopes", name, self.scopes.len());
+		self.set_var(name, false)
+	}
+
+	fn define_var(&mut self, name: &Token) -> Result<(), ParseError> {
+		// println!("!@ define_var {:?} with {:?} scopes", name, self.scopes.len());
+		self.set_var(name, true)
+	}
+
+	fn assign_var(&mut self, name: &Token) -> Result<(), ParseError> {
+		if self.scopes.is_empty() { return Ok(()) }
+		if let TokenType::Identifier(vname) = name.clone().ttype {
+			for i in (0..self.scopes.len()).rev() {
+				let scope = self.scopes.get_mut(i).unwrap();
+				if scope.contains_key(&vname) {
+					scope.insert(vname.to_string(), true);
+				}
+			}
+			Ok(())
+		} else {
+			Err(perror(self.peek_prev().clone(), "Expect identifier."))
+		}
+	}
+
+	fn set_var(&mut self, name: &Token, define: bool) -> Result<(), ParseError> {
+		if self.scopes.is_empty() { return Ok(()) }
+		if let TokenType::Identifier(ref vname) = name.ttype {
+			let scope = self.scopes.last_mut().unwrap();
+			if scope.contains_key(vname) {
+				if !define {
+					return Err(perror(name.clone(),
+						"Already a variable with this name in this scope."))
+				} else if *(scope.get(vname).unwrap()) {
+					// println!("!@COOL");
+					// return Err(perror(name.clone(),
+						// "Can't read local variable in its own initializer."))
+				}
+			}
+			scope.insert(vname.to_string(), define);
+			Ok(())
+		} else {
+			Err(perror(self.peek_prev().clone(), "Expect variable."))
+		}
+	}
+
+	fn depth_for(&self, identifier: &Token) -> Result<Rc<Option<u32>>, ParseError> {
+		// println!("!@ depth_for {:?}, scopes {:?}", identifier, self.scopes.len());
+		if let TokenType::Identifier(vname) = identifier.clone().ttype {
+			for i in (0..self.scopes.len()).rev() {
+				//!@
+				// if identifier.lexeme == "local" {
+				// 	println!("-- i: {:?}", i);
+				// }
+				if self.scopes.get(i).unwrap().contains_key(&vname) {
+					let depth = (self.scopes.len() - 1) - i;
+					return Ok(Rc::new(Some(depth as u32)))
+				}
+			}
+			Ok(Rc::new(None))
+		} else {
+			Err(perror(self.peek_prev().clone(), "Expect identifier."))
+		}
+	}
+
 	// Skip the remaining tokens in the current statemet
 	// and continue parsing the next statement.
 	fn synchronize(&mut self) -> Result<(), ParseError> {
+		if self.check(&[Eof]) { return Ok(()) }
 		self.advance()?;
 		use crate::token::TokenType::*;
 		loop {
+			if self.peek_prev().ttype == LeftBrace {
+				loop {
+					let next = self.advance()?;
+					if next.ttype == RightBrace || next.ttype == Eof {
+						break
+					}
+				}
+			}
+
 			if self.peek_prev().ttype == Semicolon {
 				return Ok(())
 			}

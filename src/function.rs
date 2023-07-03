@@ -19,7 +19,8 @@ pub struct Function {
 
 impl Function {
 	pub fn new(name: Token, params: Rc<Vec<Token>>,
-		       body: Rc<Stmt>, closure: Rc<RefCell<Environment>>) -> Self {
+		       body: Rc<Stmt>, env: Rc<RefCell<Environment>>) -> Self {
+		let closure = env;
 		Function { name, params, body, closure }
 	}
 }
@@ -39,13 +40,11 @@ impl Callable for Function {
 				_ => unreachable!()
 			}
 		);
-		// TODO: Call something!
 		match interpreter.execute_with_env(self.body.clone(), scope.clone()) {
 			Ok(obj) => Ok(obj),
 			Err(EvalError::Fail(msg)) => Err(EvalError::new(&msg)),
 			Err(EvalError::Return(obj)) => Ok(obj),
 		}
-		// Ok(Rc::new(Object::Nil))
 	}
 
 	fn debug(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {

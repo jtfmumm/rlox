@@ -102,13 +102,19 @@ impl Interpreter {
 				self.local_env = self.local_env.clone().borrow().remove_scope()?;
 				Ok(Rc::new(Object::Nil))
 			},
-			FunStmt { name, params, body } => {
+			FunStmt { name, params, body, depth } => {
 				let f = Rc::new(Function::new(name.clone(), params.clone(),
 					   						  body.clone(), self.local_env.clone()));
 				let fobj = Rc::new(Object::Fun(f));
 				match name.ttype.clone() {
 					TokenType::Identifier(name) => {
-						self.local_env.borrow_mut().declare(&name, fobj.clone());
+						if depth.is_some() {
+							// println!("!@Declare LOCAL {:?}", name);
+							self.local_env.borrow_mut().declare(&name, fobj.clone());
+						} else {
+							// println!("!@Declare GLOBAL {:?}", name);
+							self.global_env.borrow_mut().declare(&name, fobj.clone());
+						}
 					},
 					_ => unreachable!()
 				}
@@ -142,11 +148,17 @@ impl Interpreter {
 			},
 			VarDeclStmt { variable, value } => {
 				match &*variable.clone() {
-					Expr::Variable { name } => {
+					Expr::Variable { name, depth } => {
 						let val = self.evaluate(&value)?;
 						match name.ttype {
 							TokenType::Identifier(ref nm) => {
-								self.local_env.borrow_mut().declare(nm, val.clone());
+								if depth.is_some() {
+									// println!("!@Declare LOCAL {:?}, d:{:?}", name, depth);
+									self.local_env.borrow_mut().declare(nm, val.clone());
+								} else {
+									// println!("!@Declare GLOBAL {:?}, d:{:?}", name, depth);
+									self.global_env.borrow_mut().declare(nm, val.clone());
+								}
 							},
 							_ => unreachable!()
 						}
@@ -170,9 +182,15 @@ impl Interpreter {
 		match expr {
 			Assign { variable, value } => {
 				match &*variable.clone() {
-					Expr::Variable { name } => {
+					Expr::Variable { name, depth } => {
 						let val = self.evaluate(&value)?;
-						self.local_env.borrow_mut().assign(name.clone(), val.clone())?;
+						if depth.is_some() {
+							// println!("!@Assign LOCAL {:?}, d:{:?}", name, depth);
+							self.local_env.borrow_mut().assign(name.clone(), val.clone())?;
+						} else {
+							// println!("!@Assign GLOBAL {:?}, d:{:?}", name, depth);
+							self.global_env.borrow_mut().assign(name.clone(), val.clone())?;
+						}
 						Ok(val)
 					},
 					_ => Err(EvalError::new("Invalid assignment target."))
@@ -212,8 +230,14 @@ impl Interpreter {
 					Err(everr) => Err(everr.with_context(operator.clone(), &expr.to_string())),
 				}
 			},
-			Variable { ref name } => {
-				Ok(self.local_env.borrow_mut().lookup_with_backup_env(name.clone(), self.global_env.clone())?)
+			Variable { ref name, ref depth } => {
+				Ok(if let Some(d) = &*depth.clone() {
+					// println!("!@Var LOCAL {:?}, d:{:?}", name, depth);
+					self.local_env.borrow_mut().lookup(name.clone(), *d)?
+				} else {
+					// println!("!@Var GLOBAL {:?}, d:{:?}", name, depth);
+					self.global_env.borrow_mut().lookup(name.clone(), 0)?
+				})
 			},
 		}
 	}

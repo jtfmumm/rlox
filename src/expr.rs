@@ -18,7 +18,7 @@ pub enum Expr {
 	Literal { value: Rc<Object> },
 	Logic { left: Rc<Expr>, operator: Token, right: Rc<Expr> },
 	Unary { operator: Token, right: Rc<Expr> },
-	Variable { name: Token },
+	Variable { name: Token, depth: Rc<Option<u32>> },
 }
 
 impl Expr {
@@ -50,8 +50,8 @@ impl Expr {
 		Rc::new(Expr::Unary { operator, right })
 	}
 
-	pub fn variable(name: Token) -> Rc<Expr> {
-		Rc::new(Expr::Variable { name })
+	pub fn variable(name: Token, depth: Rc<Option<u32>>) -> Rc<Expr> {
+		Rc::new(Expr::Variable { name, depth })
 	}
 
 }

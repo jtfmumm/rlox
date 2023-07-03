@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2021"
 authors = ["John Mumm <jtfmumm@gmail.com>"]
 
+[dependencies]
+im = "15.1.0"
+rand = "0.8.5"
+
 [dependencies.argparse]
 version = "*"
 
