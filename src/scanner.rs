@@ -3,6 +3,8 @@ use crate::token::{Token, TokenType};
 
 use std::mem;
 
+use unicode_segmentation::UnicodeSegmentation;
+
 const KEYWORDS: [&'static str; 17] = ["and", "class", "elif", "else", "false", "fun", "for",
 							 "if", "nil", "or", "print", "return", "super", "this",
 							 "true", "var", "while"];
@@ -94,7 +96,8 @@ impl Scanner {
 			},
 			'/' => {
 				if self.match_advance('/') {
-					while !(self.is_at_end() || self.peek() == '\n')  { self.current += 1; }; return Ok(())
+					while !(self.is_at_end() || self.peek() == '\n')  { self.current += 1; };
+					return Ok(())
 				} else if self.match_advance('*') {
 					while !self.is_at_end() && !(self.peek() == '*' && self.peek_next() == '/') {
 						self.current += 1;
@@ -109,7 +112,11 @@ impl Scanner {
 					TokenType::Slash
 				}
 			}
-			'"' => self.scan_string()?,
+			'"' => {
+				let (t, s) = self.scan_string()?;
+				self.tokens.push(Token::new(t, s.clone(), s, self.line));
+				return Ok(())
+			},
 			a if a.is_alphabetic() => self.scan_word()?,
 			d if d.is_digit(10) => self.scan_number()?,
 			' ' | '\r' | '\t' => return Ok(()),
@@ -120,15 +127,16 @@ impl Scanner {
 		Ok(())
 	}
 
-	fn scan_string(&mut self) -> Result<TokenType,ScannerError> {
+	fn scan_string(&mut self) -> Result<(TokenType, String),ScannerError> {
+		let mut s = "".to_string();
 		while !self.match_advance('"') {
 			if self.is_at_end() { return Err(self.report_error("Unterminated string.")) }
 			if self.peek() == '\n' { self.line += 1;  }
-			// TODO: This doesn't handle unicode correctly.
+			// Add one by one so that Unicode can also be handled correctly.
+			s.push(self.peek());
 			self.current += 1;
 		}
-		let s_raw = &self.source_string[self.start + 1..self.current - 1];
-		Ok(TokenType::StringLit(s_raw.to_string()))
+		Ok((TokenType::StringLit(s.clone()), s))
 	}
 
 	fn scan_word(&mut self) -> Result<TokenType,ScannerError> {
@@ -163,7 +171,11 @@ impl Scanner {
 	}
 
 	fn source_substr(&self) -> String {
-		self.source_string[self.start..self.current].to_string()
+		let mut s = "".to_string();
+		for i in self.start..self.current {
+			s.push(self.source[i]);
+		}
+		s
 	}
 
 	fn keyword_token(&mut self, keyword: &str) -> Result<TokenType,ScannerError> {

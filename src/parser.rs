@@ -481,7 +481,7 @@ impl Parser {
 			Number(n) => Ok(Expr::literal(Rc::new(Object::Num(*n)))),
 			StringLit(_) => {
 				let s = self.peek_prev().literal.clone();
-				let s2 = s[1..s.len() - 1].to_string();
+				let s2 = s[0..s.len()].to_string();
 				Ok(Expr::literal(Rc::new(Object::Str(s2))))
 			},
 			True => Ok(Expr::literal(Rc::new(Object::Bool(true)))),
