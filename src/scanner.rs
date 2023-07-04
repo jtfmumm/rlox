@@ -1,16 +1,13 @@
-use crate::lox_error::{LoxError, ScannerError, scerror};
+use crate::lox_error::{LoxError, ScanError, scerror};
 use crate::token::{Token, TokenType};
 
 use std::mem;
-
-use unicode_segmentation::UnicodeSegmentation;
 
 const KEYWORDS: [&'static str; 17] = ["and", "class", "elif", "else", "false", "fun", "for",
 							 "if", "nil", "or", "print", "return", "super", "this",
 							 "true", "var", "while"];
 
 pub struct Scanner {
-	source_string: String,
 	source: Vec<char>,
 	tokens: Vec<Token>,
 	start: usize,
@@ -24,7 +21,7 @@ impl Scanner {
 		let start = 0;
 		let current = 0;
 		let line = 1;
-		Scanner { source_string: s, source, tokens: Vec::new(), start, current, line }
+		Scanner { source, tokens: Vec::new(), start, current, line }
 	}
 
 	pub fn scan_tokens(&mut self) -> Result<Vec<Token>,LoxError> {
@@ -65,11 +62,11 @@ impl Scanner {
 		}
 	}
 
-	fn report_error(&mut self, msg: &str) -> ScannerError {
+	fn report_error(&mut self, msg: &str) -> ScanError {
 		scerror(self.line, msg)
 	}
 
-	fn scan_token(&mut self) -> Result<(),ScannerError> {
+	fn scan_token(&mut self) -> Result<(),ScanError> {
 		let ch = self.advance();
 		let token_type = match ch {
 			'(' => TokenType::LeftParen,
@@ -127,7 +124,7 @@ impl Scanner {
 		Ok(())
 	}
 
-	fn scan_string(&mut self) -> Result<(TokenType, String),ScannerError> {
+	fn scan_string(&mut self) -> Result<(TokenType, String),ScanError> {
 		let mut s = "".to_string();
 		while !self.match_advance('"') {
 			if self.is_at_end() { return Err(self.report_error("Unterminated string.")) }
@@ -139,7 +136,7 @@ impl Scanner {
 		Ok((TokenType::StringLit(s.clone()), s))
 	}
 
-	fn scan_word(&mut self) -> Result<TokenType,ScannerError> {
+	fn scan_word(&mut self) -> Result<TokenType,ScanError> {
 		while !self.is_at_end() && (self.peek().is_alphanumeric() || self.peek() == '_') {
 			self.current += 1;
 		}
@@ -151,7 +148,7 @@ impl Scanner {
 		})
 	}
 
-	fn scan_number(&mut self) -> Result<TokenType,ScannerError> {
+	fn scan_number(&mut self) -> Result<TokenType,ScanError> {
 		while !self.is_at_end() && (self.peek().is_digit(10)) {
 			self.current += 1
 		}
@@ -178,7 +175,7 @@ impl Scanner {
 		s
 	}
 
-	fn keyword_token(&mut self, keyword: &str) -> Result<TokenType,ScannerError> {
+	fn keyword_token(&mut self, keyword: &str) -> Result<TokenType,ScanError> {
 		Ok(match keyword {
 			"and" => TokenType::And,
 			"class" => TokenType::Class,

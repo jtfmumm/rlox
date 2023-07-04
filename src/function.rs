@@ -41,7 +41,7 @@ impl Callable for Function {
 		);
 		match interpreter.execute_with_env(self.body.clone(), scope.clone()) {
 			Ok(obj) => Ok(obj),
-			Err(EvalError::Fail(msg)) => Err(EvalError::new(&msg)),
+			Err(EvalError::Runtime(msg)) => Err(EvalError::new(&msg)),
 			Err(EvalError::Return(obj)) => Ok(obj),
 		}
 	}
