@@ -202,7 +202,7 @@ impl Parser {
 				Expr::Variable { name, depth } => {
 					self.define_var(&name)?;
 					(
-						Box::new(Expr::variable(name.clone(), depth.clone())),
+						Box::new(Expr::variable(name.clone(), depth)),
 					 	Box::new(Expr::literal(Object::Nil))
 				 	)
 				}
@@ -304,10 +304,7 @@ impl Parser {
 
 	fn check_identifier(&mut self) -> bool {
 		if let Some(t) = self.tokens.peek() {
-			match t.ttype {
-				TokenType::Identifier(_) => true,
-				_ => false
-			}
+			matches!(t.ttype, TokenType::Identifier(_))
 		} else {
 			false
 		}
@@ -327,7 +324,7 @@ impl Parser {
 	}
 
 	fn expression(&mut self) -> Result<Expr, ParseError> {
-		Ok(self.logic_or()?)
+		self.logic_or()
 	}
 
 	fn logic_or(&mut self) -> Result<Expr, ParseError> {
@@ -470,8 +467,8 @@ impl Parser {
 		match &token.ttype {
 			False => Ok(Expr::literal(Object::Bool(false))),
 			Identifier(_) => {
-				let depth = self.depth_for(&token)?;
-				Ok(Expr::variable(token.clone().clone(), depth))
+				let depth = self.depth_for(token)?;
+				Ok(Expr::variable(token.clone(), depth))
 			},
 			LeftParen => {
 				let expr = self.expression()?;

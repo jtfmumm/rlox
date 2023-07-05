@@ -9,7 +9,7 @@ use std::rc::Rc;
 pub trait Callable {
 	fn arity(&self) -> usize;
 	fn call(&self, interpreter: &mut Interpreter,
-		    args: &Vec<Rc<Object>>) -> Result<Rc<Object>,EvalError>;
+		    args: &[Rc<Object>]) -> Result<Rc<Object>,EvalError>;
 	fn debug(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
     	write!(f, "<native fn>")
 	}

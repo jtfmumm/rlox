@@ -20,15 +20,17 @@ use std::process;
 fn main() {
   let args: Vec<_> = env::args().collect();
   let mut lox = Lox::new();
-  if args.len() > 2 {
-  	println!("Usage: rlox [script]");
-  	process::exit(64);
-  } else if args.len() == 2 {
-  	lox.run_file(&args[1]);
-  } else {
-  	match lox.run_repl() {
-      Ok(()) => {},
-      Err(err) => println!("Exited with error: {}", err)
-    };
+  match args.len() {
+    l if l > 2 => {
+      println!("Usage: rlox [script]");
+      process::exit(64);
+    },
+    l if l == 2 => lox.run_file(&args[1]),
+    _ => {
+      match lox.run_repl() {
+        Ok(()) => {},
+        Err(err) => println!("Exited with error: {}", err)
+      };
+    }
   }
 }

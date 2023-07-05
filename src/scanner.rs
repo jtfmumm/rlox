@@ -3,9 +3,9 @@ use crate::token::{Token, TokenType};
 
 use std::mem;
 
-const KEYWORDS: [&'static str; 17] = ["and", "class", "elif", "else", "false", "fun", "for",
-							 "if", "nil", "or", "print", "return", "super", "this",
-							 "true", "var", "while"];
+const KEYWORDS: [&str; 17] = ["and", "class", "elif", "else", "false", "fun", "for",
+							  "if", "nil", "or", "print", "return", "super", "this",
+							  "true", "var", "while"];
 
 pub struct Scanner {
 	source: Vec<char>,
@@ -31,7 +31,7 @@ impl Scanner {
 		}
 
 		self.tokens.push(Token::new(TokenType::Eof, "".to_string(), "".to_string(), self.line));
-		Ok(mem::replace(&mut self.tokens, Vec::new()))
+		Ok(mem::take(&mut self.tokens))
 	}
 
 	fn is_at_end(&self) -> bool {
@@ -115,7 +115,7 @@ impl Scanner {
 				return Ok(())
 			},
 			a if a.is_alphabetic() => self.scan_word()?,
-			d if d.is_digit(10) => self.scan_number()?,
+			d if d.is_ascii_digit() => self.scan_number()?,
 			' ' | '\r' | '\t' => return Ok(()),
 			'\n' => { self.line += 1; return Ok(()) },
 			_ => { return Err(self.report_error("Unexpected character.")) }
@@ -149,12 +149,12 @@ impl Scanner {
 	}
 
 	fn scan_number(&mut self) -> Result<TokenType,ScanError> {
-		while !self.is_at_end() && (self.peek().is_digit(10)) {
+		while !self.is_at_end() && (self.peek().is_ascii_digit()) {
 			self.current += 1
 		}
 		if self.match_advance('.') {
-			if !self.peek().is_digit(10) { return Err(self.report_error("Number has trailing .")) }
-			while self.peek().is_digit(10) {
+			if !self.peek().is_ascii_digit() { return Err(self.report_error("Number has trailing .")) }
+			while self.peek().is_ascii_digit() {
 				self.current += 1;
 			}
 		}

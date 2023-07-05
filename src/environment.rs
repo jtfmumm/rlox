@@ -4,6 +4,7 @@ use crate::token::{Token, TokenType};
 
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::rc::Rc;
 
 #[derive(Debug)]
@@ -59,8 +60,10 @@ impl Environment {
 			TokenType::Identifier(ref name) => name.clone(),
 			_ => return Err(EvalError::new_with_context(id.clone(), &id.to_string(), "Expect variable."))
 		};
-		if self.env.contains_key(&name) {
-			self.env.insert(name.to_string(), value);
+		// if self.env.contains_key(&name) {
+		if let Entry::Occupied(mut e) = self.env.entry(name.clone()) {
+			e.insert(value);
+			// self.env.insert(name, value);
 			Ok(())
 		} else {
 			match self.outer.take() {
@@ -70,7 +73,7 @@ impl Environment {
 					res
 				},
 				None => Err(
-					EvalError::new(&format!("Undefined variable '{}'.", name.to_string()))
+					EvalError::new(&format!("Undefined variable '{}'.", name))
 						.with_context(id.clone(), &id.to_string()))
 			}
 		}

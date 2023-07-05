@@ -29,7 +29,7 @@ impl Callable for Function {
 	fn arity(&self) -> usize { self.params.len() }
 
 	fn call(&self, interpreter: &mut Interpreter,
-		    args: &Vec<Rc<Object>>) -> Result<Rc<Object>,EvalError> {
+		    args: &[Rc<Object>]) -> Result<Rc<Object>,EvalError> {
 		let scope = Rc::new(RefCell::new(Environment::from_outer(self.closure.clone())));
 		debug_assert!(self.params.len() == args.len());
 		self.params.iter()
@@ -39,7 +39,7 @@ impl Callable for Function {
 				_ => unreachable!()
 			}
 		);
-		match interpreter.execute_with_env(&self.body, scope.clone()) {
+		match interpreter.execute_with_env(&self.body, scope) {
 			Ok(obj) => Ok(obj),
 			Err(EvalError::Runtime(msg)) => Err(EvalError::new(&msg)),
 			Err(EvalError::Return(obj)) => Ok(obj),

@@ -13,7 +13,7 @@ impl Callable for ClockFn {
 	fn arity(&self) -> usize { 0 }
 
 	fn call(&self, _interpreter: &mut Interpreter,
-		    _args: &Vec<Rc<Object>>) -> Result<Rc<Object>,EvalError> {
+		    _args: &[Rc<Object>]) -> Result<Rc<Object>,EvalError> {
 	    Ok(Rc::new(
 	    	Object::Num(
 		    	SystemTime::now()
@@ -30,7 +30,7 @@ impl Callable for StrFn {
 	fn arity(&self) -> usize { 1 }
 
 	fn call(&self, _interpreter: &mut Interpreter,
-		    args: &Vec<Rc<Object>>) -> Result<Rc<Object>,EvalError> {
+		    args: &[Rc<Object>]) -> Result<Rc<Object>,EvalError> {
 	    let arg = &args[0];
 	    let res = format!("{}", arg);
 	    Ok(Rc::new(Object::Str(res)))

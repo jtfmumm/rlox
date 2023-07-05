@@ -34,11 +34,10 @@ pub fn perror(token: Token, msg: &str) -> ParseError {
 
 fn location_for(token: &Token) -> String {
 	let lexeme = token.lexeme.to_owned();
-	let location = match token.ttype {
+	match token.ttype {
 		TokenType::Eof => "at end".to_string(),
 		_ => format!("at '{:}'", lexeme)
-	};
-	location
+	}
 }
 
 #[derive(Debug)]
@@ -106,7 +105,7 @@ impl EvalError {
 			EvalError::Return(_) => self,
 			EvalError::Runtime(old_msg) => {
 				let location = expr_str.to_string();
-				let msg = old_msg.clone() + &format!("\n[line {}] Error at {}", token.line, location);
+				let msg = old_msg + &format!("\n[line {}] Error at {}", token.line, location);
 				EvalError::Runtime(msg)
 			}
 		}

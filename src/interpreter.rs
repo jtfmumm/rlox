@@ -48,7 +48,7 @@ impl Interpreter {
 		if hit_error { Err(LoxError::Runtime) } else { Ok(()) }
 	}
 
-	pub fn execute_with_env(&mut self, stmts: &Vec<Stmt>,
+	pub fn execute_with_env(&mut self, stmts: &[Stmt],
 		                env: Rc<RefCell<Environment>>) -> Result<Rc<Object>, EvalError> {
 		let prev_env = self.local_env.clone();
 		self.local_env = env;
@@ -64,7 +64,7 @@ impl Interpreter {
 				self.execute_block(stmts)
 			},
 			ExprStmt { expr } => {
-				self.evaluate(&expr)
+				self.evaluate(expr)
 			},
 			ForStmt { init, condition, inc, block } => {
 				self.local_env = Environment::add_scope(self.local_env.clone());
@@ -72,7 +72,7 @@ impl Interpreter {
 				let tr = Expr::literal(Object::Bool(true));
 				while is_truthy(&self.evaluate(condition.as_ref().unwrap_or(&tr))?) {
 					self.execute(block)?;
-					if let Some(expr) = &*inc.clone() { self.evaluate(&*expr.clone())?; }
+					if let Some(expr) = inc { self.evaluate(expr)?; }
 				}
 				self.local_env = self.local_env.clone().borrow().remove_scope()?;
 				Ok(Rc::new(Object::Nil))
@@ -92,43 +92,43 @@ impl Interpreter {
 			IfStmt { conditionals, else_block } => {
 				for (c, blk) in conditionals.iter() {
 					if is_truthy(&self.evaluate(c)?) {
-						return self.execute(&blk)
+						return self.execute(blk)
 					}
 				}
-				if let Some(blk) = &*else_block.clone() {
-					self.execute(blk.clone())
+				if let Some(blk) = else_block {
+					self.execute(blk)
 				} else {
 					Ok(Rc::new(Object::Nil))
 				}
 			},
 			PrintStmt { expr } => {
-				let obj = self.evaluate(&expr)?;
+				let obj = self.evaluate(expr)?;
 				println!("{}", stringify_cli_result(&obj));
 				Ok(Rc::new(Object::Nil))
 			},
 			ReturnStmt { expr } => {
-				Err(EvalError::new_return(self.evaluate(&expr)?))
+				Err(EvalError::new_return(self.evaluate(expr)?))
 			},
 			VarDeclStmt { variable, value } => {
-				let val = self.evaluate(&value)?;
-				let (name, depth) = name_and_depth_for(&variable)?;
+				let val = self.evaluate(value)?;
+				let (name, depth) = name_and_depth_for(variable)?;
 				if depth.is_some() {
-					self.local_env.borrow_mut().declare(&name.lexeme, val.clone());
+					self.local_env.borrow_mut().declare(&name.lexeme, val);
 				} else {
-					self.global_env.borrow_mut().declare(&name.lexeme, val.clone());
+					self.global_env.borrow_mut().declare(&name.lexeme, val);
 				}
 				Ok(Rc::new(Object::Nil))
 			},
 			WhileStmt { condition, block } => {
 				while is_truthy(&self.evaluate(condition)?) {
-					self.execute(block.clone())?;
+					self.execute(block)?;
 				}
 				Ok(Rc::new(Object::Nil))
 			},
 		}
 	}
 
-	fn execute_block(&mut self, stmts: &Vec<Stmt>) -> Result<Rc<Object>, EvalError> {
+	fn execute_block(&mut self, stmts: &[Stmt]) -> Result<Rc<Object>, EvalError> {
 		let mut last_error = None;
 		let mut last_res = Rc::new(Object::Nil);
 		self.local_env = Environment::add_scope(self.local_env.clone());
@@ -155,12 +155,12 @@ impl Interpreter {
 		use Expr::*;
 		match expr {
 			Assign { variable, value } => {
-				let val = self.evaluate(&value)?;
-				let (name, depth) = name_and_depth_for(&variable)?;
+				let val = self.evaluate(value)?;
+				let (name, depth) = name_and_depth_for(variable)?;
 				if depth.is_some() {
-					self.local_env.borrow_mut().assign(name.clone(), val.clone())?;
+					self.local_env.borrow_mut().assign(name, val.clone())?;
 				} else {
-					self.global_env.borrow_mut().assign(name.clone(), val.clone())?;
+					self.global_env.borrow_mut().assign(name, val.clone())?;
 				}
 				Ok(val)
 			},
@@ -213,7 +213,7 @@ impl Interpreter {
 	}
 
 	pub fn eval_call(&mut self, callee: &Expr, paren: &Token, args: &Rc<Vec<Expr>>) -> Result<Rc<Object>, EvalError> {
-		match &*self.evaluate(callee)?.clone() {
+		match &*self.evaluate(callee)? {
 			Object::Fun(f) => {
 				if args.len() != f.arity() {
 					return Err(EvalError::new(&format!("Expected {} arguments but got {}.", f.arity(), args.len()))
@@ -238,7 +238,7 @@ impl Interpreter {
 		Ok(Rc::new(match &op.ttype {
 			Bang => Bool(!(is_truthy(&r))),
 			Minus => {
-				match &*r.clone() {
+				match &*r {
 					Num(n) => Num(-n),
 					_ => return Err(EvalError::new("Operand must be a number."))
 				}
@@ -272,11 +272,12 @@ impl Interpreter {
 		debug_assert!(operator.ttype == TokenType::And || operator.ttype == TokenType::Or);
 		let l = self.evaluate(left)?;
 
-		if operator.ttype == TokenType::And {
-			return Ok(if !is_truthy(&l) { l } else { self.evaluate(right)? })
-		} else {
-			return Ok(if !is_truthy(&l) { self.evaluate(right)? } else { l })
-		}
+		Ok(
+			if operator.ttype == TokenType::And {
+				if !is_truthy(&l) { l } else { self.evaluate(right)? }
+			} else if !is_truthy(&l) { self.evaluate(right)?
+			} else { l }
+		)
 	}
 }
 
@@ -301,7 +302,7 @@ fn eval_plus(l: Rc<Object>, r: Rc<Object>) -> Result<Object, EvalError> {
 fn eval_div(l: Rc<Object>, r: Rc<Object>) -> Result<Object, EvalError> {
 	let divisor = as_num(r)?;
 	if divisor == 0.0  {
-		return Err(EvalError::new(&format!("Tried to divide by 0!")))
+		return Err(EvalError::new("Tried to divide by 0!"))
 	}
 	let res = as_num(l)? / divisor;
 	Ok(Object::Num(res))
@@ -310,7 +311,7 @@ fn eval_div(l: Rc<Object>, r: Rc<Object>) -> Result<Object, EvalError> {
 fn name_and_depth_for(variable: &Expr) -> Result<(Token, Option<u32>), EvalError> {
 	match variable {
 		Expr::Variable { name, depth } => {
-			Ok((name.clone(), depth.clone()))
+			Ok((name.clone(), *depth))
 		},
 		_ => Err(EvalError::new("Invalid assignment target."))
 	}
