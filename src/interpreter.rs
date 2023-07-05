@@ -2,6 +2,7 @@ use crate::builtins::{ClockFn, StrFn};
 use crate::function::Function;
 use crate::lox_error::{EvalError, LoxError};
 use crate::environment::Environment;
+use crate::expr;
 use crate::expr::Expr;
 use crate::object::{Object, stringify_cli_result};
 use crate::stmt::Stmt;
@@ -60,16 +61,16 @@ impl Interpreter {
 	fn execute(&mut self, stmt: &Stmt) -> Result<Rc<Object>, EvalError> {
 		use Stmt::*;
 		match stmt {
-			BlockStmt { stmts } => {
+			Block { stmts } => {
 				self.execute_block(stmts)
 			},
-			ExprStmt { expr } => {
+			Expr { expr } => {
 				self.evaluate(expr)
 			},
-			ForStmt { init, condition, inc, block } => {
+			For { init, condition, inc, block } => {
 				self.local_env = Environment::add_scope(self.local_env.clone());
 				if let Some(ref stmt) = init { self.execute(stmt)?; }
-				let tr = Expr::literal(Object::Bool(true));
+				let tr = expr::Expr::Literal { value: Object::Bool(true) };
 				while is_truthy(&self.evaluate(condition.as_ref().unwrap_or(&tr))?) {
 					self.execute(block)?;
 					if let Some(expr) = inc { self.evaluate(expr)?; }
@@ -77,7 +78,7 @@ impl Interpreter {
 				self.local_env = self.local_env.clone().borrow().remove_scope()?;
 				Ok(Rc::new(Object::Nil))
 			},
-			FunStmt { name, params, body, depth } => {
+			Fun { name, params, body, depth } => {
 				let f = Rc::new(Function::new(name.clone(), params.clone(),
 					   						  body.clone(), self.local_env.clone()));
 				let fobj = Rc::new(Object::Fun(f));
@@ -89,7 +90,7 @@ impl Interpreter {
 
 				Ok(fobj)
 			},
-			IfStmt { conditionals, else_block } => {
+			If { conditionals, else_block } => {
 				for (c, blk) in conditionals.iter() {
 					if is_truthy(&self.evaluate(c)?) {
 						return self.execute(blk)
@@ -101,15 +102,15 @@ impl Interpreter {
 					Ok(Rc::new(Object::Nil))
 				}
 			},
-			PrintStmt { expr } => {
+			Print { expr } => {
 				let obj = self.evaluate(expr)?;
 				println!("{}", stringify_cli_result(&obj));
 				Ok(Rc::new(Object::Nil))
 			},
-			ReturnStmt { expr } => {
+			Return { expr } => {
 				Err(EvalError::new_return(self.evaluate(expr)?))
 			},
-			VarDeclStmt { variable, value } => {
+			VarDecl { variable, value } => {
 				let val = self.evaluate(value)?;
 				let (name, depth) = name_and_depth_for(variable)?;
 				if depth.is_some() {
@@ -119,7 +120,7 @@ impl Interpreter {
 				}
 				Ok(Rc::new(Object::Nil))
 			},
-			WhileStmt { condition, block } => {
+			While { condition, block } => {
 				while is_truthy(&self.evaluate(condition)?) {
 					self.execute(block)?;
 				}
@@ -185,8 +186,8 @@ impl Interpreter {
 			Call { ref callee, ref paren, ref args } => {
 				self.eval_call(callee, paren, args)
 			},
-			Grouping { ref expression } => {
-				self.eval_grouping(expression)
+			Grouping { ref expr } => {
+				self.eval_grouping(expr)
 			},
 			Literal { ref value } => {
 				use self::Object::*;

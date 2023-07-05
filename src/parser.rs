@@ -112,7 +112,7 @@ impl Parser {
 		if failed {
 			Err(ParseError::new("Failed while parsing block."))
 		} else {
-			Ok(Stmt::block_stmt(Box::new(stmts)))
+			Ok(Stmt::Block { stmts: Box::new(stmts) })
 		}
 	}
 
@@ -146,7 +146,7 @@ impl Parser {
 		};
 		let blk = self.block()?;
 		self.scopes.pop();
-		Ok(Stmt::for_stmt(init, condition, inc, Box::new(blk)))
+		Ok(Stmt::For { init, condition, inc, block: Box::new(blk) })
 	}
 
 	fn fun_statement(&mut self) -> Result<Stmt, ParseError> {
@@ -184,16 +184,16 @@ impl Parser {
 			return Err(perror(self.peek()?.clone(), "Expect '{' before function body."))
 		}
 		let body = match self.block_with_current_scope()? {
-			Stmt::BlockStmt { stmts } => Rc::new(*stmts),
+			Stmt::Block { stmts } => Rc::new(*stmts),
 			_ => unreachable!()
 		};
 		self.scopes.pop();
-		let fun_depth = if self.scopes.is_empty() {
+		let depth = if self.scopes.is_empty() {
 			None
 		} else {
 			Some(0)
 		};
-		Ok(Stmt::fun_stmt(name.clone(), params, body, fun_depth))
+		Ok(Stmt::Fun { name: name.clone(), params, body, depth })
 	}
 
 	fn var_statement(&mut self) -> Result<Stmt, ParseError> {
@@ -214,14 +214,14 @@ impl Parser {
 				Expr::Variable { name, depth } => {
 					self.define_var(&name)?;
 					(
-						Box::new(Expr::variable(name.clone(), depth)),
-					 	Box::new(Expr::literal(Object::Nil))
+						Box::new(Expr::Variable { name: name.clone(), depth: depth }),
+					 	Box::new(Expr::Literal { value: Object::Nil })
 				 	)
 				}
 				_ => return Err(perror(self.peek_prev().clone(), "Invalid declaration"))
 			};
 			self.advance_end_of_statement()?;
-			Ok(Stmt::var_decl_stmt(*vr, *vl))
+			Ok(Stmt::VarDecl { variable: *vr, value: *vl })
 		} else {
 			Err(perror(self.tokens.peek().unwrap().clone(), "Expect variable name."))
 		}
@@ -230,7 +230,7 @@ impl Parser {
 	fn print_statement(&mut self) -> Result<Stmt, ParseError> {
 		let expr = self.expression()?;
 		self.advance_end_of_statement()?;
-		Ok(Stmt::print_stmt(expr))
+		Ok(Stmt::Print { expr })
 	}
 
 	fn if_statement(&mut self) -> Result<Stmt, ParseError> {
@@ -248,7 +248,7 @@ impl Parser {
 			let stmt = self.statement()?;
 			else_block = Some(Box::new(stmt));
 		}
-		Ok(Stmt::if_stmt(conditionals, else_block))
+		Ok(Stmt::If { conditionals, else_block })
 	}
 
 	fn while_statement(&mut self) -> Result<Stmt, ParseError> {
@@ -256,7 +256,7 @@ impl Parser {
 		let condition = self.expression()?;
 		self.consume(TokenType::RightParen, "Expect ) for condition.")?;
 		let blk = self.block()?;
-		Ok(Stmt::while_stmt(condition, Box::new(blk)))
+		Ok(Stmt::While { condition, block: Box::new(blk)} )
 	}
 
 	fn return_statement(&mut self) -> Result<Stmt, ParseError> {
@@ -264,17 +264,17 @@ impl Parser {
 			return Err(perror(self.peek_prev().clone(), "Can't return from top-level code."))
 		}
 		if self.match_advance(&[TokenType::Semicolon]) {
-			return Ok(Stmt::return_stmt(Expr::literal(Object::Nil)))
+			return Ok(Stmt::Return { expr: Expr::Literal { value:Object::Nil } })
 		}
 		let expr = self.expression()?;
 		self.advance_end_of_statement()?;
-		Ok(Stmt::return_stmt(expr))
+		Ok(Stmt::Return { expr })
 	}
 
 	fn expr_statement(&mut self) -> Result<Stmt, ParseError> {
 		let expr = self.expression()?;
 		self.advance_end_of_statement()?;
-		Ok(Stmt::expr_stmt(expr))
+		Ok(Stmt::Expr { expr })
 	}
 
 	fn peek(&mut self) -> Result<&Token, ParseError> {
@@ -343,9 +343,9 @@ impl Parser {
 		let mut expr = self.logic_and()?;
 
 		while self.match_advance(&[TokenType::Or]) {
-			let op = self.peek_prev().clone();
+			let operator = self.peek_prev().clone();
 			let right = self.logic_and()?;
-			expr = Expr::logic(Box::new(expr), op, Box::new(right));
+			expr = Expr::Logic { left: Box::new(expr), operator, right: Box::new(right) };
 		}
 		Ok(expr)
 	}
@@ -354,9 +354,9 @@ impl Parser {
 		let mut expr = self.assignment()?;
 
 		while self.match_advance(&[TokenType::And]) {
-			let op = self.peek_prev().clone();
+			let operator = self.peek_prev().clone();
 			let right = self.assignment()?;
-			expr = Expr::logic(Box::new(expr), op, Box::new(right));
+			expr = Expr::Logic { left: Box::new(expr), operator, right: Box::new(right) };
 		}
 		Ok(expr)
 	}
@@ -371,7 +371,7 @@ impl Parser {
 			};
 			self.assign_var(&vname)?;
 			let value = self.expression()?;
-			expr = Expr::assign(Box::new(expr), Box::new(value))
+			expr = Expr::Assign { variable: Box::new(expr), value: Box::new(value) }
 		}
 		Ok(expr)
 	}
@@ -380,9 +380,9 @@ impl Parser {
 		let mut expr = self.comparison()?;
 
 		while self.match_advance(&[TokenType::BangEqual, TokenType::EqualEqual]) {
-			let op = self.peek_prev().clone();
+			let operator = self.peek_prev().clone();
 			let right = self.comparison()?;
-			expr = Expr::binary(Box::new(expr), op, Box::new(right));
+			expr = Expr::Binary { left: Box::new(expr), operator, right: Box::new(right) };
 		}
 		Ok(expr)
 	}
@@ -392,9 +392,9 @@ impl Parser {
 
 		while self.match_advance(&[TokenType::Greater, TokenType::GreaterEqual,
 								   TokenType::Less, TokenType::LessEqual]) {
-			let op = self.peek_prev().clone();
+			let operator = self.peek_prev().clone();
 			let right = self.term()?;
-			expr = Expr::binary(Box::new(expr), op, Box::new(right));
+			expr = Expr::Binary { left: Box::new(expr), operator, right: Box::new(right) };
 		}
 		Ok(expr)
 	}
@@ -403,9 +403,9 @@ impl Parser {
 		let mut expr = self.factor()?;
 
 		while self.match_advance(&[TokenType::Minus, TokenType::Plus]) {
-			let op = self.peek_prev().clone();
+			let operator = self.peek_prev().clone();
 			let right = self.factor()?;
-			expr = Expr::binary(Box::new(expr), op, Box::new(right));
+			expr = Expr::Binary { left: Box::new(expr), operator, right: Box::new(right) };
 		}
 		Ok(expr)
 	}
@@ -414,18 +414,18 @@ impl Parser {
 		let mut expr = self.unary()?;
 
 		while self.match_advance(&[TokenType::Slash, TokenType::Star]) {
-			let op = self.peek_prev().clone();
+			let operator = self.peek_prev().clone();
 			let right = self.unary()?;
-			expr = Expr::binary(Box::new(expr), op, Box::new(right));
+			expr = Expr::Binary { left: Box::new(expr), operator, right: Box::new(right) };
 		}
 		Ok(expr)
 	}
 
 	fn unary(&mut self) -> Result<Expr, ParseError> {
 		if self.match_advance(&[TokenType::Bang, TokenType::Minus]) {
-			let op = self.peek_prev().clone();
+			let operator = self.peek_prev().clone();
 			let right = self.unary()?;
-			Ok(Expr::unary(op, Box::new(right)))
+			Ok(Expr::Unary { operator, right: Box::new(right) })
 		} else {
 			Ok(self.call()?)
 		}
@@ -451,7 +451,7 @@ impl Parser {
 			self.call_args()?
 		};
 		if self.check(&[TokenType::RightParen]) {
-			Ok(Expr::call(expr, self.advance()?.clone(), args))
+			Ok(Expr::Call { callee: expr, paren: self.advance()?.clone(), args })
 		} else {
 			Err(perror(self.peek()?.clone(), "Expect )."))
 		}
@@ -477,24 +477,24 @@ impl Parser {
 		}
 		let token = &self.advance()?.clone();
 		match &token.ttype {
-			False => Ok(Expr::literal(Object::Bool(false))),
+			False => Ok(Expr::Literal { value: Object::Bool(false) }),
 			Identifier(_) => {
 				let depth = self.depth_for(token)?;
-				Ok(Expr::variable(token.clone(), depth))
+				Ok(Expr::Variable { name: token.clone(), depth })
 			},
 			LeftParen => {
 				let expr = self.expression()?;
 				self.consume(TokenType::RightParen, "Expect )!")?;
-				Ok(Expr::grouping(Box::new(expr)))
+				Ok(Expr::Grouping { expr: Box::new(expr) })
 			},
-			Nil => Ok(Expr::literal(Object::Nil)),
-			Number(n) => Ok(Expr::literal(Object::Num(*n))),
+			Nil => Ok(Expr::Literal { value: Object::Nil }),
+			Number(n) => Ok(Expr::Literal { value: Object::Num(*n) }),
 			StringLit(_) => {
 				let s = self.peek_prev().literal.clone();
 				let s2 = s[0..s.len()].to_string();
-				Ok(Expr::literal(Object::Str(s2)))
+				Ok(Expr::Literal { value: Object::Str(s2) })
 			},
-			True => Ok(Expr::literal(Object::Bool(true))),
+			True => Ok(Expr::Literal { value: Object::Bool(true) }),
 			_ => {
 				Err(perror(self.peek_prev().clone(), "Expect expression."))
 			}
