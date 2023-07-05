@@ -8,7 +8,7 @@ macro_rules! p {
 
 fn main() {
 	Command::new("python")
-	        .arg("tools/ast_gen.py")
+	        .arg("codegen/ast_gen.py")
 	        .spawn()
 	        .expect("python command failed to start");
 
