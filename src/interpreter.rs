@@ -81,15 +81,10 @@ impl Interpreter {
 				let f = Rc::new(Function::new(name.clone(), params.clone(),
 					   						  body.clone(), self.local_env.clone()));
 				let fobj = Rc::new(Object::Fun(f));
-				match name.ttype.clone() {
-					TokenType::Identifier(name) => {
-						if depth.is_some() {
-							self.local_env.borrow_mut().declare(&name, fobj.clone());
-						} else {
-							self.global_env.borrow_mut().declare(&name, fobj.clone());
-						}
-					},
-					_ => unreachable!()
+				if depth.is_some() {
+					self.local_env.borrow_mut().declare(&name.lexeme, fobj.clone());
+				} else {
+					self.global_env.borrow_mut().declare(&name.lexeme, fobj.clone());
 				}
 
 				Ok(fobj)
@@ -115,23 +110,14 @@ impl Interpreter {
 				Err(EvalError::new_return(self.evaluate(&expr)?))
 			},
 			VarDeclStmt { variable, value } => {
-				match &*variable.clone() {
-					Expr::Variable { name, depth } => {
-						let val = self.evaluate(&value)?;
-						match name.ttype {
-							TokenType::Identifier(ref nm) => {
-								if depth.is_some() {
-									self.local_env.borrow_mut().declare(nm, val.clone());
-								} else {
-									self.global_env.borrow_mut().declare(nm, val.clone());
-								}
-							},
-							_ => unreachable!()
-						}
-						Ok(Rc::new(Object::Nil))
-					},
-					_ => Err(EvalError::new("Expect declaration to declare variable."))
+				let val = self.evaluate(&value)?;
+				let (name, depth) = name_and_depth_for(&variable)?;
+				if depth.is_some() {
+					self.local_env.borrow_mut().declare(&name.lexeme, val.clone());
+				} else {
+					self.global_env.borrow_mut().declare(&name.lexeme, val.clone());
 				}
+				Ok(Rc::new(Object::Nil))
 			},
 			WhileStmt { condition, block } => {
 				while is_truthy(&self.evaluate(condition)?) {
@@ -167,21 +153,16 @@ impl Interpreter {
 
 	pub fn evaluate(&mut self, expr: &Expr) -> Result<Rc<Object>, EvalError> {
 		use Expr::*;
-
 		match expr {
 			Assign { variable, value } => {
-				match **variable {
-					Expr::Variable { ref name, ref depth } => {
-						let val = self.evaluate(&value)?;
-						if depth.is_some() {
-							self.local_env.borrow_mut().assign(name.clone(), val.clone())?;
-						} else {
-							self.global_env.borrow_mut().assign(name.clone(), val.clone())?;
-						}
-						Ok(val)
-					},
-					_ => Err(EvalError::new("Invalid assignment target."))
+				let val = self.evaluate(&value)?;
+				let (name, depth) = name_and_depth_for(&variable)?;
+				if depth.is_some() {
+					self.local_env.borrow_mut().assign(name.clone(), val.clone())?;
+				} else {
+					self.global_env.borrow_mut().assign(name.clone(), val.clone())?;
 				}
+				Ok(val)
 			},
 			Binary { ref left, ref operator, ref right } => {
 				match self.eval_binary(left, operator, right) {
@@ -324,6 +305,15 @@ fn eval_div(l: Rc<Object>, r: Rc<Object>) -> Result<Object, EvalError> {
 	}
 	let res = as_num(l)? / divisor;
 	Ok(Object::Num(res))
+}
+
+fn name_and_depth_for(variable: &Expr) -> Result<(Token, Option<u32>), EvalError> {
+	match variable {
+		Expr::Variable { name, depth } => {
+			Ok((name.clone(), depth.clone()))
+		},
+		_ => Err(EvalError::new("Invalid assignment target."))
+	}
 }
 
 fn is_truthy(obj: &Rc<Object>) -> bool {

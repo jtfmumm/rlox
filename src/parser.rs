@@ -81,9 +81,7 @@ impl Parser {
 		if self.match_advance(&[TokenType::LeftBrace]) {
 			while !self.match_advance(&[TokenType::RightBrace]) {
 				match self.declaration() {
-					Ok(stmt) => {
-						stmts.push(stmt);
-					},
+					Ok(stmt) => stmts.push(stmt),
 					Err(_) => {
 						failed = true;
 						let _ = self.synchronize();
