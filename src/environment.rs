@@ -60,10 +60,8 @@ impl Environment {
 			TokenType::Identifier(ref name) => name.clone(),
 			_ => return Err(EvalError::new_with_context(id.clone(), &id.to_string(), "Expect variable."))
 		};
-		// if self.env.contains_key(&name) {
 		if let Entry::Occupied(mut e) = self.env.entry(name.clone()) {
 			e.insert(value);
-			// self.env.insert(name, value);
 			Ok(())
 		} else {
 			match self.outer.take() {
