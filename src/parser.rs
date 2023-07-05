@@ -74,7 +74,17 @@ impl Parser {
 	}
 
 	fn block(&mut self) -> Result<Stmt, ParseError> {
-		self.scopes.push(HashMap::new());
+		self._block(false)
+	}
+
+	fn block_with_current_scope(&mut self) -> Result<Stmt, ParseError> {
+		self._block(true)
+	}
+
+	fn _block(&mut self, use_current_scope: bool) -> Result<Stmt, ParseError> {
+		if !use_current_scope {
+			self.scopes.push(HashMap::new());
+		}
 		let mut stmts = Vec::new();
 		let mut failed = false;
 
@@ -95,7 +105,9 @@ impl Parser {
 			stmts.push(self.statement()?)
 		}
 
-		self.scopes.pop();
+		if !use_current_scope {
+			self.scopes.pop();
+		}
 
 		if failed {
 			Err(ParseError::new("Failed while parsing block."))
@@ -171,7 +183,7 @@ impl Parser {
 		if !self.check(&[TokenType::LeftBrace]) {
 			return Err(perror(self.peek()?.clone(), "Expect '{' before function body."))
 		}
-		let body = match self.block()? {
+		let body = match self.block_with_current_scope()? {
 			Stmt::BlockStmt { stmts } => Rc::new(*stmts),
 			_ => unreachable!()
 		};

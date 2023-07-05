@@ -52,7 +52,7 @@ impl Interpreter {
 		                env: Rc<RefCell<Environment>>) -> Result<Rc<Object>, EvalError> {
 		let prev_env = self.local_env.clone();
 		self.local_env = env;
-		let res = self.execute_block(stmts);
+		let res = self.execute_block_with_current_scope(stmts);
 		self.local_env = prev_env;
 		res
 	}
@@ -129,9 +129,19 @@ impl Interpreter {
 	}
 
 	fn execute_block(&mut self, stmts: &[Stmt]) -> Result<Rc<Object>, EvalError> {
+		self._execute_block(stmts, false)
+	}
+
+	fn execute_block_with_current_scope(&mut self, stmts: &[Stmt]) -> Result<Rc<Object>, EvalError> {
+		self._execute_block(stmts, true)
+	}
+
+	fn _execute_block(&mut self, stmts: &[Stmt], use_current_scope: bool) -> Result<Rc<Object>, EvalError> {
 		let mut last_error = None;
 		let mut last_res = Rc::new(Object::Nil);
-		self.local_env = Environment::add_scope(self.local_env.clone());
+		if !use_current_scope {
+			self.local_env = Environment::add_scope(self.local_env.clone());
+		}
 		for stmt in stmts.iter() {
 			match self.execute(stmt) {
 				Ok(obj) => {
@@ -147,7 +157,9 @@ impl Interpreter {
 				}
 			}
 		}
-		self.local_env = self.local_env.clone().borrow().remove_scope()?;
+		if !use_current_scope {
+			self.local_env = self.local_env.clone().borrow().remove_scope()?;
+		}
 		if let Some(err) = last_error { Err(err) } else { Ok(last_res) }
 	}
 
