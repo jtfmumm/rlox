@@ -30,13 +30,11 @@ impl Interpreter {
 		self.is_repl = true;
 	}
 
-	pub fn interpret(&mut self, stmts: Vec<Stmt>) -> Result<Rc<Object>,LoxError> {
+	pub fn interpret(&mut self, stmts: Vec<Stmt>) -> Result<(),LoxError> {
 		let mut hit_error = false;
-		let mut last_res = Rc::new(Object::Nil);
 		for stmt in stmts {
 			match self.execute(&stmt) {
 				Ok(obj) => {
-					last_res = obj.clone();
 					if self.is_repl {
 						println!("val: {}", stringify_cli_result(&obj));
 					}
@@ -47,7 +45,7 @@ impl Interpreter {
 				}
 			}
 		}
-		if hit_error { Err(LoxError::Runtime) } else { Ok(last_res.clone()) }
+		if hit_error { Err(LoxError::Runtime) } else { Ok(()) }
 	}
 
 	pub fn execute_with_env(&mut self, stmts: &Vec<Stmt>,
