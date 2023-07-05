@@ -1,6 +1,6 @@
 # Lox interpreter test suite
 
-These tests were all written by Robert Nystrom.
+These tests were all written by Bob Nystrom.
 
 ## Testing
 

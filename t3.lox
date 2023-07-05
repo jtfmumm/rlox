@@ -1,8 +1,0 @@
-fun add(a, b) {
-  if (a > 3) { return; }
-  return a + b;
-}
-
-print add(1, 2);
-print add(4, 2);
-print add(3, 2);

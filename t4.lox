@@ -1,5 +1,0 @@
-fun greet(name) {
-	print "hi " + name;
-}
-
-greet("Bob");
