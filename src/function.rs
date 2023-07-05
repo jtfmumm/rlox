@@ -11,55 +11,68 @@ use std::fmt;
 use std::rc::Rc;
 
 pub struct Function {
-	name: Token,
-	params: Vec<Token>,
-	body: Rc<Vec<Stmt>>,
-	closure: Rc<RefCell<Environment>>
+    name: Token,
+    params: Vec<Token>,
+    body: Rc<Vec<Stmt>>,
+    closure: Rc<RefCell<Environment>>,
 }
 
 impl Function {
-	pub fn new(name: Token, params: Vec<Token>,
-		       body: Rc<Vec<Stmt>>, env: Rc<RefCell<Environment>>) -> Self {
-		let closure = env;
-		Function { name, params, body, closure }
-	}
+    pub fn new(
+        name: Token,
+        params: Vec<Token>,
+        body: Rc<Vec<Stmt>>,
+        env: Rc<RefCell<Environment>>,
+    ) -> Self {
+        let closure = env;
+        Function {
+            name,
+            params,
+            body,
+            closure,
+        }
+    }
 }
 
 impl Callable for Function {
-	fn arity(&self) -> usize { self.params.len() }
+    fn arity(&self) -> usize {
+        self.params.len()
+    }
 
-	fn call(&self, interpreter: &mut Interpreter,
-		    args: &[Rc<Object>]) -> Result<Rc<Object>,EvalError> {
-		let scope = Rc::new(RefCell::new(Environment::from_outer(self.closure.clone())));
-		debug_assert!(self.params.len() == args.len());
-		self.params.iter()
-			.zip(args)
-			.for_each(|(p, a)| match p.ttype.clone() {
-				TokenType::Identifier(name) => scope.borrow_mut().declare(&name, a.clone()),
-				_ => unreachable!()
-			}
-		);
-		match interpreter.execute_with_env(&self.body, scope) {
-			Ok(obj) => Ok(obj),
-			Err(EvalError::Runtime(msg)) => Err(EvalError::new(&msg)),
-			Err(EvalError::Return(obj)) => Ok(obj),
-		}
-	}
+    fn call(
+        &self,
+        interpreter: &mut Interpreter,
+        args: &[Rc<Object>],
+    ) -> Result<Rc<Object>, EvalError> {
+        let scope = Rc::new(RefCell::new(Environment::from_outer(self.closure.clone())));
+        debug_assert!(self.params.len() == args.len());
+        self.params
+            .iter()
+            .zip(args)
+            .for_each(|(p, a)| match p.ttype.clone() {
+                TokenType::Identifier(name) => scope.borrow_mut().declare(&name, a.clone()),
+                _ => unreachable!(),
+            });
+        match interpreter.execute_with_env(&self.body, scope) {
+            Ok(obj) => Ok(obj),
+            Err(EvalError::Runtime(msg)) => Err(EvalError::new(&msg)),
+            Err(EvalError::Return(obj)) => Ok(obj),
+        }
+    }
 
-	fn debug(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
-    	write!(f, "{}", &format!("<fn {}>", self.name))
-	}
+    fn debug(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", &format!("<fn {}>", self.name))
+    }
 }
-
 
 impl fmt::Debug for Function {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
-    	write!(f, "{}", &format!("<fn {}>", self.name))
+        write!(f, "{}", &format!("<fn {}>", self.name))
     }
 }
 
 impl fmt::Display for Function {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
-    	write!(f, "{}", &format!("<fn {}>", self.name))
+        write!(f, "{}", &format!("<fn {}>", self.name))
     }
 }
