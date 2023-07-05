@@ -11,15 +11,25 @@ This Rust-based Lox interpreter is currently a simple tree-walking interpreter. 
 ## Implemented
 
 Tree-walking interpreter
+
 [x] scanning/lexing
+
 [x] parsing
+
 [x] evaluating
+
 [x] statements
+
 [x] control flow
+
 [x] functions
+
 [x] scope resolution
+
 [ ] classes
+
 [ ] inheritance
+
 
 Future: implement the bytecode-based version.
 
