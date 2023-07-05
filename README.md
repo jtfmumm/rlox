@@ -43,7 +43,7 @@ target/release/rlox
 
 Run a Lox file:
 ```
-target/release/rlox path/to/my/file.lox
+target/release/rlox examples/hello-world.lox
 ```
 
 ## Tests

@@ -1,6 +1,6 @@
 # Lox interpreter test suite
 
-These tests were all written by Bob Nystrom.
+These tests were written by Bob Nystrom for testing Lox interpreters.
 
 ## Testing
 
@@ -10,15 +10,22 @@ Run `dart pub get` in ./tool to get deps.
 
 I've copied in Nystrom's Lox interpreter test suite. From his testing docs:
 
-```
-If you had an interpreter executable at my_code/boblox, you could test it like:
+> If you had an interpreter executable at my_code/boblox, you could test it like:
 
-$ dart tool/bin/test.dart clox --interpreter my_code/boblox
+>
 
-You still need to tell it which suite of tests to run because that determines the test expectations. If your interpreter should behave like jlox, use "jlox" as the suite name. If it behaves like clox, use "clox". If your interpreter is only complete up to the end of one of the chapters in the book, you can use that chapter as the suite, like "chap10_functions".
+> $ dart tool/bin/test.dart clox --interpreter my_code/boblox
 
-If your interpreter needs other command line arguments passed to use, pass them to the test runner using --arguments and it will forward to your interpreter.
-```
+>
+
+> You still need to tell it which suite of tests to run because that determines the test expectations. If your interpreter should behave like jlox, use "jlox" as the suite name. If it behaves like clox, use "clox". If your interpreter is only complete up to the end of one of the chapters in the book, you can use that chapter as the suite, like "chap10_functions".
+
+>
+
+> If your interpreter needs other command line arguments passed to use, pass them to the test runner using --arguments and it will forward to your interpreter.
+
+
+Tests are organized by feature sets:
 
 chap04_scanning
 chap05_representing
