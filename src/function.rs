@@ -12,14 +12,14 @@ use std::rc::Rc;
 
 pub struct Function {
 	name: Token,
-	params: Rc<Vec<Token>>,
-	body: Rc<Stmt>,
+	params: Vec<Token>,
+	body: Rc<Vec<Stmt>>,
 	closure: Rc<RefCell<Environment>>
 }
 
 impl Function {
-	pub fn new(name: Token, params: Rc<Vec<Token>>,
-		       body: Rc<Stmt>, env: Rc<RefCell<Environment>>) -> Self {
+	pub fn new(name: Token, params: Vec<Token>,
+		       body: Rc<Vec<Stmt>>, env: Rc<RefCell<Environment>>) -> Self {
 		let closure = env;
 		Function { name, params, body, closure }
 	}
@@ -39,7 +39,7 @@ impl Callable for Function {
 				_ => unreachable!()
 			}
 		);
-		match interpreter.execute_with_env(self.body.clone(), scope.clone()) {
+		match interpreter.execute_with_env(&self.body, scope.clone()) {
 			Ok(obj) => Ok(obj),
 			Err(EvalError::Runtime(msg)) => Err(EvalError::new(&msg)),
 			Err(EvalError::Return(obj)) => Ok(obj),

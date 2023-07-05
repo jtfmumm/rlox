@@ -23,7 +23,7 @@ impl Parser {
 				 scopes: Vec::new() }
 	}
 
-	pub fn parse(&mut self) -> Result<Vec<Rc<Stmt>>, LoxError> {
+	pub fn parse(&mut self) -> Result<Vec<Stmt>, LoxError> {
 		let mut stmts = Vec::new();
 		let mut failed = false;
 		while self.tokens.peek().unwrap().ttype != TokenType::Eof {
@@ -45,7 +45,7 @@ impl Parser {
 		}
 	}
 
-	fn declaration(&mut self) -> Result<Rc<Stmt>, ParseError> {
+	fn declaration(&mut self) -> Result<Stmt, ParseError> {
 		if self.match_advance(&[TokenType::Fun]) {
 			self.fun_statement()
 		} else if self.match_advance(&[TokenType::Var]) {
@@ -55,7 +55,7 @@ impl Parser {
 		}
 	}
 
-	fn statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
+	fn statement(&mut self) -> Result<Stmt, ParseError> {
 		if self.match_advance(&[TokenType::Print]) {
 			self.print_statement()
 		} else if self.check(&[TokenType::LeftBrace]) {
@@ -73,7 +73,7 @@ impl Parser {
 		}
 	}
 
-	fn block(&mut self) -> Result<Rc<Stmt>, ParseError> {
+	fn block(&mut self) -> Result<Stmt, ParseError> {
 		self.scopes.push(HashMap::new());
 		let mut stmts = Vec::new();
 		let mut failed = false;
@@ -102,11 +102,11 @@ impl Parser {
 		if failed {
 			Err(ParseError::new("Failed while parsing block."))
 		} else {
-			Ok(Stmt::block_stmt(Rc::new(stmts)))
+			Ok(Stmt::block_stmt(Box::new(stmts)))
 		}
 	}
 
-	fn for_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
+	fn for_statement(&mut self) -> Result<Stmt, ParseError> {
 		self.scopes.push(HashMap::new());
 		self.consume(TokenType::LeftParen, "Expect ( for condition.")?;
 		let init = if self.match_advance(&[TokenType::Semicolon]) {
@@ -115,7 +115,7 @@ impl Parser {
 			if !(self.check_var() || self.check_identifier()) {
 				return Err(perror(self.peek()?.clone(), "Expect expression."))
 			}
-			Some(self.declaration()?)
+			Some(Box::new(self.declaration()?))
 		};
 		let condition = if self.match_advance(&[TokenType::Semicolon]) {
 			None
@@ -136,10 +136,10 @@ impl Parser {
 		};
 		let blk = self.block()?;
 		self.scopes.pop();
-		Ok(Stmt::for_stmt(Rc::new(init), Rc::new(condition), Rc::new(inc), blk))
+		Ok(Stmt::for_stmt(init, condition, inc, Box::new(blk)))
 	}
 
-	fn fun_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
+	fn fun_statement(&mut self) -> Result<Stmt, ParseError> {
 		let name = if self.check_identifier() {
 			self.advance()?.clone()
 		} else {
@@ -152,7 +152,7 @@ impl Parser {
 		if !self.check(&[TokenType::RightParen]) {
 			loop {
 				if self.check_identifier() {
-					match &*self.expression()?.clone() {
+					match self.expression()? {
 						Expr::Variable { name, .. } => {
 							self.declare_var(&name)?;
 							self.define_var(&name)?;
@@ -173,54 +173,57 @@ impl Parser {
 		if !self.check(&[TokenType::LeftBrace]) {
 			return Err(perror(self.peek()?.clone(), "Expect '{' before function body."))
 		}
-		let body = self.block()?;
+		let body = match self.block()? {
+			Stmt::BlockStmt { stmts } => Rc::new(*stmts),
+			_ => unreachable!()
+		};
 		self.scopes.pop();
-		let fun_depth = Rc::new(if self.scopes.is_empty() {
+		let fun_depth = if self.scopes.is_empty() {
 			None
 		} else {
 			Some(0)
-		});
-		Ok(Stmt::fun_stmt(name.clone(), Rc::new(params), body.clone(), fun_depth))
+		};
+		Ok(Stmt::fun_stmt(name.clone(), params, body, fun_depth))
 	}
 
-	fn var_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
+	fn var_statement(&mut self) -> Result<Stmt, ParseError> {
 		if self.check_identifier() {
 			let vname = self.peek()?.clone();
 			self.declare_var(&vname)?;
-			let (vr, vl) = match &*self.expression()?.clone() {
+			let (vr, vl) = match self.expression()? {
 				Expr::Assign { variable, value } => {
-					if let Expr::Variable { name, .. } = &*value.clone() {
+					if let Expr::Variable { ref name, .. } = *value {
 						if &vname == name && self.depth_for(&vname)?.is_some() {
 							return Err(perror(self.peek_prev().clone(),
 								"Can't read local variable in its own initializer."));
 						}
 					}
 					self.define_var(&vname)?;
-					(variable.clone(), value.clone())
+					(variable, value)
 				},
 				Expr::Variable { name, depth } => {
 					self.define_var(&name)?;
 					(
-						Expr::variable(name.clone(), depth.clone()),
-					 	Expr::literal(Rc::new(Object::Nil))
+						Box::new(Expr::variable(name.clone(), depth.clone())),
+					 	Box::new(Expr::literal(Object::Nil))
 				 	)
 				}
 				_ => return Err(perror(self.peek_prev().clone(), "Invalid declaration"))
 			};
 			self.advance_end_of_statement()?;
-			Ok(Stmt::var_decl_stmt(vr, vl))
+			Ok(Stmt::var_decl_stmt(*vr, *vl))
 		} else {
 			Err(perror(self.tokens.peek().unwrap().clone(), "Expect variable name."))
 		}
 	}
 
-	fn print_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
+	fn print_statement(&mut self) -> Result<Stmt, ParseError> {
 		let expr = self.expression()?;
 		self.advance_end_of_statement()?;
 		Ok(Stmt::print_stmt(expr))
 	}
 
-	fn if_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
+	fn if_statement(&mut self) -> Result<Stmt, ParseError> {
 		let mut conditionals = Vec::new();
 		let mut else_block = None;
 		loop {
@@ -228,37 +231,37 @@ impl Parser {
 			let conditional = self.expression()?;
 			self.consume(TokenType::RightParen, "Expect ) for condition.")?;
 			let blk = self.block()?;
-			conditionals.push((conditional, blk));
+			conditionals.push((conditional, Box::new(blk)));
 			if !self.match_advance(&[TokenType::Elif]) { break }
 		}
 		if self.match_advance(&[TokenType::Else]) {
 			let stmt = self.statement()?;
-			else_block = Some(stmt);
+			else_block = Some(Box::new(stmt));
 		}
-		Ok(Stmt::if_stmt(Rc::new(conditionals), Rc::new(else_block)))
+		Ok(Stmt::if_stmt(conditionals, else_block))
 	}
 
-	fn while_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
+	fn while_statement(&mut self) -> Result<Stmt, ParseError> {
 		self.consume(TokenType::LeftParen, "Expect ( for condition.")?;
 		let condition = self.expression()?;
 		self.consume(TokenType::RightParen, "Expect ) for condition.")?;
 		let blk = self.block()?;
-		Ok(Stmt::while_stmt(condition, blk))
+		Ok(Stmt::while_stmt(condition, Box::new(blk)))
 	}
 
-	fn return_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
+	fn return_statement(&mut self) -> Result<Stmt, ParseError> {
 		if self.scopes.is_empty() {
 			return Err(perror(self.peek_prev().clone(), "Can't return from top-level code."))
 		}
 		if self.match_advance(&[TokenType::Semicolon]) {
-			return Ok(Stmt::return_stmt(Expr::literal(Rc::new(Object::Nil))))
+			return Ok(Stmt::return_stmt(Expr::literal(Object::Nil)))
 		}
 		let expr = self.expression()?;
 		self.advance_end_of_statement()?;
 		Ok(Stmt::return_stmt(expr))
 	}
 
-	fn expr_statement(&mut self) -> Result<Rc<Stmt>, ParseError> {
+	fn expr_statement(&mut self) -> Result<Stmt, ParseError> {
 		let expr = self.expression()?;
 		self.advance_end_of_statement()?;
 		Ok(Stmt::expr_stmt(expr))
@@ -325,108 +328,108 @@ impl Parser {
 		self.consume(TokenType::Semicolon, "Expect ';' after expression.")
 	}
 
-	fn expression(&mut self) -> Result<Rc<Expr>, ParseError> {
+	fn expression(&mut self) -> Result<Expr, ParseError> {
 		Ok(self.logic_or()?)
 	}
 
-	fn logic_or(&mut self) -> Result<Rc<Expr>, ParseError> {
+	fn logic_or(&mut self) -> Result<Expr, ParseError> {
 		let mut expr = self.logic_and()?;
 
 		while self.match_advance(&[TokenType::Or]) {
 			let op = self.peek_prev().clone();
 			let right = self.logic_and()?;
-			expr = Expr::logic(expr, op, right);
+			expr = Expr::logic(Box::new(expr), op, Box::new(right));
 		}
 		Ok(expr)
 	}
 
-	fn logic_and(&mut self) -> Result<Rc<Expr>, ParseError> {
+	fn logic_and(&mut self) -> Result<Expr, ParseError> {
 		let mut expr = self.assignment()?;
 
 		while self.match_advance(&[TokenType::And]) {
 			let op = self.peek_prev().clone();
 			let right = self.assignment()?;
-			expr = Expr::logic(expr, op, right);
+			expr = Expr::logic(Box::new(expr), op, Box::new(right));
 		}
 		Ok(expr)
 	}
 
-	fn assignment(&mut self) -> Result<Rc<Expr>, ParseError> {
+	fn assignment(&mut self) -> Result<Expr, ParseError> {
 		let mut expr = self.equality()?;
 
 		if self.match_advance(&[TokenType::Equal]) {
-			let vname = match &*expr.clone() {
-				Expr::Variable { name, .. } => name.clone(),
+			let vname = match expr {
+				Expr::Variable { ref name, .. } => name.clone(),
 				_ => return Err(perror(self.peek_prev().clone(), "Invalid assignment target."))
 			};
 			self.assign_var(&vname)?;
 			let value = self.expression()?;
-			expr = Expr::assign(expr, value)
+			expr = Expr::assign(Box::new(expr), Box::new(value))
 		}
 		Ok(expr)
 	}
 
-	fn equality(&mut self) -> Result<Rc<Expr>, ParseError> {
+	fn equality(&mut self) -> Result<Expr, ParseError> {
 		let mut expr = self.comparison()?;
 
 		while self.match_advance(&[TokenType::BangEqual, TokenType::EqualEqual]) {
 			let op = self.peek_prev().clone();
 			let right = self.comparison()?;
-			expr = Expr::binary(expr, op, right);
+			expr = Expr::binary(Box::new(expr), op, Box::new(right));
 		}
 		Ok(expr)
 	}
 
-	fn comparison(&mut self) -> Result<Rc<Expr>, ParseError> {
+	fn comparison(&mut self) -> Result<Expr, ParseError> {
 		let mut expr = self.term()?;
 
 		while self.match_advance(&[TokenType::Greater, TokenType::GreaterEqual,
 								   TokenType::Less, TokenType::LessEqual]) {
 			let op = self.peek_prev().clone();
 			let right = self.term()?;
-			expr = Expr::binary(expr, op, right);
+			expr = Expr::binary(Box::new(expr), op, Box::new(right));
 		}
 		Ok(expr)
 	}
 
-	fn term(&mut self) -> Result<Rc<Expr>, ParseError> {
+	fn term(&mut self) -> Result<Expr, ParseError> {
 		let mut expr = self.factor()?;
 
 		while self.match_advance(&[TokenType::Minus, TokenType::Plus]) {
 			let op = self.peek_prev().clone();
 			let right = self.factor()?;
-			expr = Expr::binary(expr, op, right);
+			expr = Expr::binary(Box::new(expr), op, Box::new(right));
 		}
 		Ok(expr)
 	}
 
-	fn factor(&mut self) -> Result<Rc<Expr>, ParseError> {
+	fn factor(&mut self) -> Result<Expr, ParseError> {
 		let mut expr = self.unary()?;
 
 		while self.match_advance(&[TokenType::Slash, TokenType::Star]) {
 			let op = self.peek_prev().clone();
 			let right = self.unary()?;
-			expr = Expr::binary(expr, op, right);
+			expr = Expr::binary(Box::new(expr), op, Box::new(right));
 		}
 		Ok(expr)
 	}
 
-	fn unary(&mut self) -> Result<Rc<Expr>, ParseError> {
+	fn unary(&mut self) -> Result<Expr, ParseError> {
 		if self.match_advance(&[TokenType::Bang, TokenType::Minus]) {
 			let op = self.peek_prev().clone();
 			let right = self.unary()?;
-			Ok(Expr::unary(op, right))
+			Ok(Expr::unary(op, Box::new(right)))
 		} else {
 			Ok(self.call()?)
 		}
 	}
 
-	fn call(&mut self) -> Result<Rc<Expr>, ParseError> {
+	fn call(&mut self) -> Result<Expr, ParseError> {
 		let mut expr = self.primary()?;
 
 		loop {
 			if self.match_advance(&[TokenType::LeftParen]) {
-				expr = self.build_call(expr)?;
+				expr = self.build_call(Rc::new(expr))?;
 			} else {
 				break
 			}
@@ -434,7 +437,7 @@ impl Parser {
 		Ok(expr)
 	}
 
-	fn build_call(&mut self, expr: Rc<Expr>) -> Result<Rc<Expr>, ParseError> {
+	fn build_call(&mut self, expr: Rc<Expr>) -> Result<Expr, ParseError> {
 		let args = if self.check(&[TokenType::RightParen]) {
 			Rc::new(Vec::new())
 		} else {
@@ -447,7 +450,7 @@ impl Parser {
 		}
 	}
 
-	fn call_args(&mut self) -> Result<Rc<Vec<Rc<Expr>>>, ParseError> {
+	fn call_args(&mut self) -> Result<Rc<Vec<Expr>>, ParseError> {
 		let mut args = Vec::new();
 		loop {
 			args.push(self.expression()?);
@@ -460,14 +463,14 @@ impl Parser {
 		}
 	}
 
-	fn primary(&mut self) -> Result<Rc<Expr>, ParseError> {
+	fn primary(&mut self) -> Result<Expr, ParseError> {
 		use crate::token::TokenType::*;
 		if self.check(&[TokenType::Semicolon]) {
 			return Err(perror(self.peek()?.clone(), "Expect expression."))
 		}
 		let token = &self.advance()?.clone();
 		match &token.ttype {
-			False => Ok(Expr::literal(Rc::new(Object::Bool(false)))),
+			False => Ok(Expr::literal(Object::Bool(false))),
 			Identifier(_) => {
 				let depth = self.depth_for(&token)?;
 				Ok(Expr::variable(token.clone().clone(), depth))
@@ -475,16 +478,16 @@ impl Parser {
 			LeftParen => {
 				let expr = self.expression()?;
 				self.consume(TokenType::RightParen, "Expect )!")?;
-				Ok(Expr::grouping(expr))
+				Ok(Expr::grouping(Box::new(expr)))
 			},
-			Nil => Ok(Expr::literal(Rc::new(Object::Nil))),
-			Number(n) => Ok(Expr::literal(Rc::new(Object::Num(*n)))),
+			Nil => Ok(Expr::literal(Object::Nil)),
+			Number(n) => Ok(Expr::literal(Object::Num(*n))),
 			StringLit(_) => {
 				let s = self.peek_prev().literal.clone();
 				let s2 = s[0..s.len()].to_string();
-				Ok(Expr::literal(Rc::new(Object::Str(s2))))
+				Ok(Expr::literal(Object::Str(s2)))
 			},
-			True => Ok(Expr::literal(Rc::new(Object::Bool(true)))),
+			True => Ok(Expr::literal(Object::Bool(true))),
 			_ => {
 				Err(perror(self.peek_prev().clone(), "Expect expression."))
 			}
@@ -529,15 +532,15 @@ impl Parser {
 		}
 	}
 
-	fn depth_for(&self, identifier: &Token) -> Result<Rc<Option<u32>>, ParseError> {
+	fn depth_for(&self, identifier: &Token) -> Result<Option<u32>, ParseError> {
 		if let TokenType::Identifier(ref vname) = identifier.ttype {
 			for i in (0..self.scopes.len()).rev() {
 				if self.scopes.get(i).unwrap().contains_key(vname) {
 					let depth = (self.scopes.len() - 1) - i;
-					return Ok(Rc::new(Some(depth as u32)))
+					return Ok(Some(depth as u32))
 				}
 			}
-			Ok(Rc::new(None))
+			Ok(None)
 		} else {
 			Err(perror(self.peek_prev().clone(), "Expect identifier."))
 		}

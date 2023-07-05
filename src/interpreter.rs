@@ -30,11 +30,11 @@ impl Interpreter {
 		self.is_repl = true;
 	}
 
-	pub fn interpret(&mut self, stmts: Vec<Rc<Stmt>>) -> Result<Rc<Object>,LoxError> {
+	pub fn interpret(&mut self, stmts: Vec<Stmt>) -> Result<Rc<Object>,LoxError> {
 		let mut hit_error = false;
 		let mut last_res = Rc::new(Object::Nil);
 		for stmt in stmts {
-			match self.execute(stmt) {
+			match self.execute(&stmt) {
 				Ok(obj) => {
 					last_res = obj.clone();
 					if self.is_repl {
@@ -50,53 +50,30 @@ impl Interpreter {
 		if hit_error { Err(LoxError::Runtime) } else { Ok(last_res.clone()) }
 	}
 
-	pub fn execute_with_env(&mut self, stmt: Rc<Stmt>,
+	pub fn execute_with_env(&mut self, stmts: &Vec<Stmt>,
 		                env: Rc<RefCell<Environment>>) -> Result<Rc<Object>, EvalError> {
 		let prev_env = self.local_env.clone();
 		self.local_env = env;
-		let res = self.execute(stmt);
+		let res = self.execute_block(stmts);
 		self.local_env = prev_env;
 		res
 	}
 
-	fn execute(&mut self, stmt: Rc<Stmt>) -> Result<Rc<Object>, EvalError> {
+	fn execute(&mut self, stmt: &Stmt) -> Result<Rc<Object>, EvalError> {
 		use Stmt::*;
-		match &*stmt {
+		match stmt {
 			BlockStmt { stmts } => {
-				let mut last_error = None;
-				let mut last_res = Rc::new(Object::Nil);
-				self.local_env = Environment::add_scope(self.local_env.clone());
-				for stmt in stmts.to_vec() {
-					match self.execute(stmt) {
-						Ok(obj) => {
-							last_res = obj.clone();
-							if self.is_repl {
-								println!("val: {}", stringify_cli_result(&obj));
-							}
-						},
-						Err(EvalError::Return(obj)) => return Err(EvalError::Return(obj)),
-						Err(err) => {
-							err.report();
-							last_error = Some(err);
-						}
-					}
-				}
-				self.local_env = self.local_env.clone().borrow().remove_scope()?;
-				if let Some(err) = last_error { Err(err) } else { Ok(last_res) }
+				self.execute_block(stmts)
 			},
 			ExprStmt { expr } => {
 				self.evaluate(&expr)
 			},
 			ForStmt { init, condition, inc, block } => {
 				self.local_env = Environment::add_scope(self.local_env.clone());
-				if let Some(stmt) = &*init.clone() { self.execute(stmt.clone())?; }
-				let cond = if let Some(ref exp) = &*condition.clone() {
-					exp.clone()
-				} else {
-					Expr::literal(Rc::new(Object::Bool(true)))
-				};
-				while is_truthy(&self.evaluate(&cond)?) {
-					self.execute(block.clone())?;
+				if let Some(ref stmt) = init { self.execute(stmt)?; }
+				let tr = Expr::literal(Object::Bool(true));
+				while is_truthy(&self.evaluate(condition.as_ref().unwrap_or(&tr))?) {
+					self.execute(block)?;
 					if let Some(expr) = &*inc.clone() { self.evaluate(&*expr.clone())?; }
 				}
 				self.local_env = self.local_env.clone().borrow().remove_scope()?;
@@ -122,7 +99,7 @@ impl Interpreter {
 			IfStmt { conditionals, else_block } => {
 				for (c, blk) in conditionals.iter() {
 					if is_truthy(&self.evaluate(c)?) {
-						return self.execute(blk.clone())
+						return self.execute(&blk)
 					}
 				}
 				if let Some(blk) = &*else_block.clone() {
@@ -167,13 +144,36 @@ impl Interpreter {
 		}
 	}
 
+	fn execute_block(&mut self, stmts: &Vec<Stmt>) -> Result<Rc<Object>, EvalError> {
+		let mut last_error = None;
+		let mut last_res = Rc::new(Object::Nil);
+		self.local_env = Environment::add_scope(self.local_env.clone());
+		for stmt in stmts.iter() {
+			match self.execute(stmt) {
+				Ok(obj) => {
+					last_res = obj.clone();
+					if self.is_repl {
+						println!("val: {}", stringify_cli_result(&obj));
+					}
+				},
+				Err(EvalError::Return(obj)) => return Err(EvalError::Return(obj)),
+				Err(err) => {
+					err.report();
+					last_error = Some(err);
+				}
+			}
+		}
+		self.local_env = self.local_env.clone().borrow().remove_scope()?;
+		if let Some(err) = last_error { Err(err) } else { Ok(last_res) }
+	}
+
 	pub fn evaluate(&mut self, expr: &Expr) -> Result<Rc<Object>, EvalError> {
 		use Expr::*;
 
 		match expr {
 			Assign { variable, value } => {
-				match &*variable.clone() {
-					Expr::Variable { name, depth } => {
+				match **variable {
+					Expr::Variable { ref name, ref depth } => {
 						let val = self.evaluate(&value)?;
 						if depth.is_some() {
 							self.local_env.borrow_mut().assign(name.clone(), val.clone())?;
@@ -199,7 +199,7 @@ impl Interpreter {
 			},
 			Literal { ref value } => {
 				use self::Object::*;
-				Ok(Rc::new(match &*value.clone() {
+				Ok(Rc::new(match value {
 					Nil => Nil,
 					Bool(b) => Bool(*b),
 					Num(n) => Num(*n),
@@ -220,7 +220,7 @@ impl Interpreter {
 				}
 			},
 			Variable { ref name, ref depth } => {
-				Ok(if let Some(d) = &*depth.clone() {
+				Ok(if let Some(d) = depth {
 					self.local_env.borrow_mut().lookup(name.clone(), *d)?
 				} else {
 					self.global_env.borrow_mut().lookup(name.clone(), 0)?
@@ -233,7 +233,7 @@ impl Interpreter {
 		self.evaluate(expr)
 	}
 
-	pub fn eval_call(&mut self, callee: &Expr, paren: &Token, args: &Vec<Rc<Expr>>) -> Result<Rc<Object>, EvalError> {
+	pub fn eval_call(&mut self, callee: &Expr, paren: &Token, args: &Rc<Vec<Expr>>) -> Result<Rc<Object>, EvalError> {
 		match &*self.evaluate(callee)?.clone() {
 			Object::Fun(f) => {
 				if args.len() != f.arity() {

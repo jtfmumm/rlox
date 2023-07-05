@@ -52,7 +52,6 @@ def gen_source(prelude, enum, def_file, target_file):
 	output += prelude
 	output += """
 use std::fmt;
-use std::rc::Rc;
 	"""
 	output += '\n#[derive(Debug)]\n'
 	output += 'pub enum ' + enum + ' {\n'
@@ -67,9 +66,11 @@ use std::rc::Rc;
 	for v in variants:
 		fn_name = new_fn_name(v.name)
 		output += '\tpub fn ' + fn_name + '('
-		output += ', '.join(map(str, v.fields)) + ') -> Rc<' + enum + '> {\n'
-		output += '\t\tRc::new(' + enum + '::' + v.name + ' { '
-		output += ', '.join(v.field_names()) + ' })\n\t}\n\n'
+		# output += ', '.join(map(str, v.fields)) + ') -> Rc<' + enum + '> {\n'
+		# output += '\t\tRc::new(' + enum + '::' + v.name + ' { '
+		output += ', '.join(map(str, v.fields)) + ') -> ' + enum + ' {\n'
+		output += '\t\t' + enum + '::' + v.name + ' { '
+		output += ', '.join(v.field_names()) + ' }\n\t}\n\n'
 
 	output += '}\n\n'
 
@@ -88,6 +89,7 @@ use std::rc::Rc;
 expr_prelude = """
 use crate::object::Object;
 use crate::token::Token;
+use std::rc::Rc;
 """
 
 gen_source(expr_prelude, 'Expr', 'ast_def.json', 'src/expr.rs')
@@ -95,6 +97,7 @@ gen_source(expr_prelude, 'Expr', 'ast_def.json', 'src/expr.rs')
 stmt_prelude = """
 use crate::expr::Expr;
 use crate::token::Token;
+use std::rc::Rc;
 """
 
 gen_source(stmt_prelude, 'Stmt', 'ast_def.json', 'src/stmt.rs')

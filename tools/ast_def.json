@@ -1,23 +1,23 @@
 {
 "Expr": [
-	"Assign   : Rc<Expr> variable, Rc<Expr> value",
-	"Binary   : Rc<Expr> left, Token operator, Rc<Expr> right",
-	"Call     : Rc<Expr> callee, Token paren, Rc<Vec<Rc<Expr>>> args",
-	"Grouping : Rc<Expr> expression",
-	"Literal  : Rc<Object> value",
-	"Logic    : Rc<Expr> left, Token operator, Rc<Expr> right",
-	"Unary    : Token operator, Rc<Expr> right",
-	"Variable : Token name, Rc<Option<u32>> depth"
+	"Assign   : Box<Expr> variable, Box<Expr> value",
+	"Binary   : Box<Expr> left, Token operator, Box<Expr> right",
+	"Call     : Rc<Expr> callee, Token paren, Rc<Vec<Expr>> args",
+	"Grouping : Box<Expr> expression",
+	"Literal  : Object value",
+	"Logic    : Box<Expr> left, Token operator, Box<Expr> right",
+	"Unary    : Token operator, Box<Expr> right",
+	"Variable : Token name, Option<u32> depth"
 ],
 "Stmt": [
-	"BlockStmt   : Rc<Vec<Rc<Stmt>>> stmts",
-	"ExprStmt    : Rc<Expr> expr",
-	"ForStmt     : Rc<Option<Rc<Stmt>>> init, Rc<Option<Rc<Expr>>> condition, Rc<Option<Rc<Expr>>> inc, Rc<Stmt> block",
-    "FunStmt     : Token name, Rc<Vec<Token>> params, Rc<Stmt> body, Rc<Option<u32>> depth",
-	"IfStmt      : Rc<Vec<(Rc<Expr>-Rc<Stmt>)>> conditionals, Rc<Option<Rc<Stmt>>> else_block",
-	"PrintStmt   : Rc<Expr> expr",
-	"ReturnStmt  : Rc<Expr> expr",
-	"VarDeclStmt : Rc<Expr> variable, Rc<Expr> value",
-	"WhileStmt   : Rc<Expr> condition, Rc<Stmt> block"
+	"BlockStmt   : Box<Vec<Stmt>> stmts",
+	"ExprStmt    : Expr expr",
+	"ForStmt     : Option<Box<Stmt>> init, Option<Expr> condition, Option<Expr> inc, Box<Stmt> block",
+    "FunStmt     : Token name, Vec<Token> params, Rc<Vec<Stmt>> body, Option<u32> depth",
+	"IfStmt      : Vec<(Expr-Box<Stmt>)> conditionals, Option<Box<Stmt>> else_block",
+	"PrintStmt   : Expr expr",
+	"ReturnStmt  : Expr expr",
+	"VarDeclStmt : Expr variable, Expr value",
+	"WhileStmt   : Expr condition, Box<Stmt> block"
 ]
 }
