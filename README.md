@@ -22,7 +22,7 @@ Tree-walking interpreter
 - [ ] classes
 - [ ] inheritance
 
-Future: implement the bytecode-based version.
+Future: implement the much faster bytecode version.
 
 ## Usage
 
