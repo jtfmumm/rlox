@@ -1,5 +1,6 @@
 use crate::interpreter::Interpreter;
 use crate::lox_error::LoxError;
+use crate::object::{stringify_cli_result, Object};
 use crate::parser::Parser;
 use crate::scanner::Scanner;
 
@@ -7,6 +8,7 @@ use std::fs;
 use std::io;
 use std::io::Write;
 use std::process;
+use std::rc::Rc;
 
 const COMPILE_ERROR_CODE: i32 = 65;
 const RUNTIME_ERROR_CODE: i32 = 70;
@@ -22,7 +24,7 @@ impl Lox {
         }
     }
 
-    pub fn run_file(&mut self, arg: &str) {
+    pub fn run_file(&mut self, arg: &str) -> io::Result<()> {
         let contents = fs::read_to_string(arg).expect("Should have been able to read the file");
 
         match self.run(contents) {
@@ -33,11 +35,11 @@ impl Lox {
                 LoxError::Scan => process::exit(COMPILE_ERROR_CODE),
             },
         }
+        Ok(())
     }
 
     pub fn run_repl(&mut self) -> io::Result<()> {
         let exit_string = "exit()\n".to_string();
-        self.interpreter.repl();
         loop {
             print!("> ");
             io::stdout().flush()?;
@@ -48,13 +50,16 @@ impl Lox {
                 s if s == exit_string => break,
                 _ => {}
             }
-            let _ = self.run(user_input);
+            match self.run(user_input) {
+                Ok(obj) => println!("val: {}", stringify_cli_result(&obj)),
+                Err(err) => println!("Exited with error: {}", err),
+            }
         }
 
         Ok(())
     }
 
-    fn run(&mut self, source: String) -> Result<(), LoxError> {
+    fn run(&mut self, source: String) -> Result<Rc<Object>, LoxError> {
         let mut scanner = Scanner::new(source);
         let tokens = scanner.scan_tokens()?;
         let mut parser = Parser::new(tokens);

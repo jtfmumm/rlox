@@ -22,28 +22,20 @@ impl Interpreter {
         let mut global_env = Environment::new();
         global_env.declare("clock", Rc::new(Object::Fun(Rc::new(ClockFn {}))));
         global_env.declare("str", Rc::new(Object::Fun(Rc::new(StrFn {}))));
-        let local_env = Rc::new(RefCell::new(Environment::new()));
 
         Interpreter {
             is_repl: false,
             global_env: Rc::new(RefCell::new(global_env)),
-            local_env,
+            local_env: Rc::new(RefCell::new(Environment::new())),
         }
     }
 
-    pub fn repl(&mut self) {
-        self.is_repl = true;
-    }
-
-    pub fn interpret(&mut self, stmts: Vec<Stmt>) -> Result<(), LoxError> {
+    pub fn interpret(&mut self, stmts: Vec<Stmt>) -> Result<Rc<Object>, LoxError> {
         let mut hit_error = false;
+        let mut last_result = Rc::new(Object::Nil);
         for stmt in stmts {
             match self.execute(&stmt) {
-                Ok(obj) => {
-                    if self.is_repl {
-                        println!("val: {}", stringify_cli_result(&obj));
-                    }
-                }
+                Ok(obj) => last_result = obj,
                 Err(err) => {
                     err.report();
                     hit_error = true;
@@ -53,7 +45,7 @@ impl Interpreter {
         if hit_error {
             Err(LoxError::Runtime)
         } else {
-            Ok(())
+            Ok(last_result)
         }
     }
 

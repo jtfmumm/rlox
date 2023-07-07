@@ -243,7 +243,7 @@ impl Parser {
                     (
                         Box::new(Expr::Variable {
                             name: name.clone(),
-                            depth: depth,
+                            depth,
                         }),
                         Box::new(Expr::Literal { value: Object::Nil }),
                     )
