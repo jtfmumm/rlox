@@ -1,0 +1,28 @@
+
+fun check_guess(guess, number) {
+	if (guess == number) {
+		print "You guessed it!";
+		return true;
+	} else if (guess > number) {
+		print "No, too high!";
+	} else {
+		print "No, too low!";
+	}
+	return false;
+}
+
+fun run_game() {
+	var n = rand_int(1, 10);
+	var found = false;
+
+	print "I'm thinking of a number from 1 to 10.";
+	while (!found) {
+		var raw_guess = input("What is your guess? ");
+		if (raw_guess != "") {
+			found = check_guess(num(raw_guess), n);
+		}
+	}
+}
+
+run_game();
+

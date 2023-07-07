@@ -44,7 +44,7 @@ target/release/rlox
 
 Run a Lox file:
 ```
-target/release/rlox examples/hello-world.lox
+target/release/rlox examples/guessing_game.lox
 ```
 
 ## Tests

@@ -1,4 +1,4 @@
-use crate::builtins::{ClockFn, StrFn};
+use crate::builtins::*;
 use crate::environment::Environment;
 use crate::expr;
 use crate::expr::Expr;
@@ -21,6 +21,9 @@ impl Interpreter {
     pub fn new() -> Self {
         let mut global_env = Environment::new();
         global_env.declare("clock", Rc::new(Object::Fun(Rc::new(ClockFn {}))));
+        global_env.declare("input", Rc::new(Object::Fun(Rc::new(InputFn {}))));
+        global_env.declare("num", Rc::new(Object::Fun(Rc::new(NumFn {}))));
+        global_env.declare("rand_int", Rc::new(Object::Fun(Rc::new(RandIntFn {}))));
         global_env.declare("str", Rc::new(Object::Fun(Rc::new(StrFn {}))));
 
         Interpreter {

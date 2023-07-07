@@ -4,4 +4,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["John Mumm <jtfmumm@gmail.com>"]
 
+[dependencies]
+rand = "0.8.5"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
