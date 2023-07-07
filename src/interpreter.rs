@@ -19,18 +19,14 @@ pub struct Interpreter {
 
 impl Interpreter {
     pub fn new() -> Self {
-        let global_env = Rc::new(RefCell::new(Environment::new()));
+        let mut global_env = Environment::new();
+        global_env.declare("clock", Rc::new(Object::Fun(Rc::new(ClockFn {}))));
+        global_env.declare("str", Rc::new(Object::Fun(Rc::new(StrFn {}))));
         let local_env = Rc::new(RefCell::new(Environment::new()));
-        global_env
-            .borrow_mut()
-            .declare("clock", Rc::new(Object::Fun(Rc::new(ClockFn {}))));
-        global_env
-            .borrow_mut()
-            .declare("str", Rc::new(Object::Fun(Rc::new(StrFn {}))));
 
         Interpreter {
             is_repl: false,
-            global_env,
+            global_env: Rc::new(RefCell::new(global_env)),
             local_env,
         }
     }
