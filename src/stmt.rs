@@ -7,7 +7,7 @@ use std::fmt;
 #[derive(Debug)]
 pub enum Stmt {
     Block {
-        stmts: Box<Vec<Stmt>>,
+        stmts: Vec<Stmt>,
     },
     Expr {
         expr: Expr,

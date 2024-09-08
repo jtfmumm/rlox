@@ -25,7 +25,7 @@ fn main() {
             println!("Usage: rlox [script]");
             process::exit(64);
         }
-        l if l == 2 => lox.run_file(&args[1]),
+        2 => lox.run_file(&args[1]),
         _ => lox.run_repl(),
     };
 }

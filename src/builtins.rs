@@ -66,7 +66,7 @@ impl Callable for NumFn {
         let arg = &args[0];
         match &format!("{}", arg).parse::<f64>() {
             Ok(n) => Ok(Rc::new(Object::Num(*n))),
-            Err(_) => Err(EvalError::new("Expect number."))
+            Err(_) => Err(EvalError::new("Expect number.")),
         }
     }
 }
@@ -88,8 +88,8 @@ impl Callable for InputFn {
         let prompt = &args[0];
         print!("{}", prompt);
         match io::stdout().flush() {
-            Ok(_) => {},
-            Err(err) => return Err(EvalError::new(&format!("{:?}", err)))
+            Ok(_) => {}
+            Err(err) => return Err(EvalError::new(&format!("{:?}", err))),
         };
         io::stdin().read_line(&mut line).unwrap();
         line.pop(); // remove \n
@@ -111,8 +111,9 @@ impl Callable for RandIntFn {
         args: &[Rc<Object>],
     ) -> Result<Rc<Object>, EvalError> {
         let mut rng = rand::thread_rng();
-        let (Object::Num(low), Object::Num(high)) = (&*args[0], &*args[1])
-            else { return Err(EvalError::new("Expect numbers.")) };
+        let (Object::Num(low), Object::Num(high)) = (&*args[0], &*args[1]) else {
+            return Err(EvalError::new("Expect numbers."));
+        };
         let res = rng.gen_range(*low as i32..*high as i32 + 1);
         Ok(Rc::new(Object::Num(res as f64)))
     }

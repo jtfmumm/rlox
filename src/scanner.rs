@@ -130,7 +130,7 @@ impl Scanner {
                     }
                     return Ok(());
                 } else if self.match_advance('*') {
-                    while !self.is_at_end() && !(self.peek() == '*' && self.peek_next() == '/') {
+                    while !(self.is_at_end() || (self.peek() == '*' && self.peek_next() == '/')) {
                         self.current += 1;
                     }
                     if self.is_at_end() {

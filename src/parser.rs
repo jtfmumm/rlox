@@ -117,9 +117,7 @@ impl Parser {
         if failed {
             Err(ParseError::new("Failed while parsing block."))
         } else {
-            Ok(Stmt::Block {
-                stmts: Box::new(stmts),
-            })
+            Ok(Stmt::Block { stmts })
         }
     }
 
@@ -204,7 +202,7 @@ impl Parser {
             ));
         }
         let body = match self.block_with_current_scope()? {
-            Stmt::Block { stmts } => Rc::new(*stmts),
+            Stmt::Block { stmts } => Rc::new(stmts),
             _ => unreachable!(),
         };
         self.scopes.pop();
